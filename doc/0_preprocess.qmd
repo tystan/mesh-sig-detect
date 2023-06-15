@@ -1,0 +1,107 @@
+---
+title: "Data preprocessing for analysis"
+subtitle: "Signal detection of spontaneous medical device reports over time"
+author: "Ty Stanford and Curtis Murray"
+format: 
+  pdf:
+    toc: true
+    highlight-style: atom-one
+    number-sections: true
+editor: source
+---
+
+
+<!-- highlight-style supported themes: arrow, pygments, tango, espresso, zenburn, kate, monochrome, breezedark, haddock, atom-one, ayu, breeze, dracula, github, gruvbox, monokai, nord, oblivion, printing, radical, solarized, and vim. -->
+
+
+```{R}
+#| include: false
+knitr::read_chunk('../r/0_preprocess.R')
+```
+
+
+\newpage
+
+# Set up
+
+## Packages
+
+
+```{R, libs}
+```
+
+## Constants
+
+
+```{R, consts}
+```
+
+
+\newpage
+
+
+# Data wrangling
+
+## Read data
+
+
+```{R, load_dat}
+```
+
+## Clean/remove duplicates
+
+
+```{R, check_dups}
+```
+
+
+
+## Inspect and summarise data
+
+
+```{R, inspect}
+#| fig.width: 7
+#| fig.height: 5
+```
+
+\newpage
+
+
+# Create data for analysis from raw data
+
+## Creation of analysis data
+
+
+```{R, create_analysis_data}
+```
+
+## Check analysis data
+
+
+```{R, check_analysis_data}
+```
+
+## Export analysis data
+
+
+```{R, export}
+```
+
+
+
+
+\newpage
+
+# Session information
+
+
+```{R}
+format(Sys.time(), '%d %b %Y')
+Sys.info() %>% as.data.frame(.)
+sessionInfo()
+```
+
+
+
+
+
