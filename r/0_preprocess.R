@@ -7,8 +7,6 @@ suppressPackageStartupMessages({
   library("dplyr")
   library("tidyr")
   library("lubridate") # way to handle dates better than default R way
-  library("ggplot2") 
-  library("ggrepel") 
   library("knitr")
   library("foreach")
   library("arrow") # read/write parquet files
@@ -17,7 +15,7 @@ suppressPackageStartupMessages({
 
 
 # here are the functions written for this project
-source("../r/_funcs.R")
+source("r/_funcs.R")
 
 
 # ---- consts ----
@@ -26,8 +24,8 @@ source("../r/_funcs.R")
 arbitrary_cell_min <- 1
 
 # these are the thresholds for pain_topic to be pain == TRUE
-# thresholds <- c(0.010, 0.025, 0.05, 0.075, 0.100) 
-thresholds <- seq(0.010, 0.100, by = 0.005) #, 0.150) 
+# thresholds <- c(0.010, 0.025, 0.05, 0.075, 0.100, 0.150) 
+thresholds <- seq(0.010, 0.100, by = 0.005) 
 
 
 col_pal <- c("cyan4", "darkorange", "purple", "dodgerblue")
@@ -66,7 +64,7 @@ clean_data_cols <-
     type = col_character()
   )
 
-clean_data <- read_csv("../dat/clean_data.csv", col_types = clean_data_cols)
+clean_data <- read_csv("dat/clean_data.csv", col_types = clean_data_cols)
 
 
 # ---- check_dups ----
@@ -98,7 +96,7 @@ clean_data <-
 clean_data %>%
   dplyr::filter(type == "other_mesh") %>%
   # select(Report_ID) %>%
-  write_csv("../out/other_mesh_ids.csv")
+  write_csv("out/other_mesh_ids.csv")
 
 
 
@@ -297,7 +295,7 @@ sra_dat <-
   )
 
 sra_dat %>%
-  write_parquet(., sink = "../dat/sra_dat.parquet")
+  write_parquet(., sink = "dat/sra_dat.parquet")
 
 
 

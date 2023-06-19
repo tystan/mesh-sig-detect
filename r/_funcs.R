@@ -189,17 +189,6 @@ get_signal_dat <-
   }
 
 
-# Ty Stanford (2022-05-24)
-
-pretty_da <- function(mnth, thresh, nA, nB, nC, nD, alpha = 0.05, n_mcmc = 1e+05) {
-  
-  out_cols_of_interest <- c("est_name", "est_scale", "est", "ci_lo", "ci_hi")
-  da <- pharmsignal::bcpnn_mcmc_signal(nA, nB, nC, nD, alpha = alpha, n_mcmc = n_mcmc)
-  da <- da[, out_cols_of_interest]
-  da <- bind_cols(tibble(mnth = mnth), tibble(thresh = thresh), da)
-  return(da)
-  
-}
 
 
 

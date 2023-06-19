@@ -1,5 +1,5 @@
 ---
-title: "Data preprocessing for analysis"
+title: "Data analysis"
 subtitle: "Signal detection of spontaneous medical device reports over time"
 author: "Ty Stanford and Curtis Murray"
 format: 
@@ -16,7 +16,7 @@ editor: source
 
 ```{R}
 #| include: false
-knitr::read_chunk('../r/0_preprocess.R')
+knitr::read_chunk('r/1_data_analysis.R')
 ```
 
 
@@ -27,13 +27,13 @@ knitr::read_chunk('../r/0_preprocess.R')
 ## Packages
 
 
-```{R, libs}
+```{R, lib}
 ```
 
-## Constants
+## Parallel compution setup
 
 
-```{R, consts}
+```{R, check_parallel_comp}
 ```
 
 

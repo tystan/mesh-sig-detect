@@ -47,3 +47,8 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# ignore adhoc testing folder
+_test*
+
+
