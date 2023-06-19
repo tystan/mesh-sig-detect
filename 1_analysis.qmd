@@ -1,7 +1,7 @@
 ---
 title: "Data analysis"
 subtitle: "Signal detection of spontaneous medical device reports over time"
-author: "Ty Stanford and Curtis Murray"
+author: "Ty Stanford et al."
 format: 
   pdf:
     toc: true
@@ -27,7 +27,7 @@ knitr::read_chunk('r/1_data_analysis.R')
 ## Packages
 
 
-```{R, lib}
+```{R, libs}
 ```
 
 ## Parallel compution setup
@@ -36,56 +36,41 @@ knitr::read_chunk('r/1_data_analysis.R')
 ```{R, check_parallel_comp}
 ```
 
+## Constants
 
-\newpage
+
+```{R, consts}
+```
+
+## Functions
 
 
-# Data wrangling
+```{R, funcs}
+```
 
-## Read data
+## Load data
 
 
 ```{R, load_dat}
 ```
 
-## Clean/remove duplicates
-
-
-```{R, check_dups}
-```
-
-
-
-## Inspect and summarise data
-
-
-```{R, inspect}
-#| fig.width: 7
-#| fig.height: 5
-```
-
 \newpage
 
 
-# Create data for analysis from raw data
-
-## Creation of analysis data
+# Analysis
 
 
-```{R, create_analysis_data}
+## BCPNN
+
+
+```{R, bcpnn_calcs}
 ```
 
-## Check analysis data
+## BCPNN with mult comp adjust
 
 
-```{R, check_analysis_data}
-```
+## MaxSPRT
 
-## Export analysis data
-
-
-```{R, export}
-```
 
 
 
@@ -93,6 +78,9 @@ knitr::read_chunk('r/1_data_analysis.R')
 \newpage
 
 # Session information
+
+```{R, end}
+```
 
 
 ```{R}

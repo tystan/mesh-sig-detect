@@ -1,0 +1,105 @@
+---
+title: "Report"
+subtitle: "Signal detection of spontaneous medical device reports over time accounting for multiple comparisons"
+author: "Ty Stanford et al."
+format: 
+  pdf:
+    toc: true
+    highlight-style: atom-one
+    number-sections: true
+editor: source
+---
+
+
+<!-- highlight-style supported themes: arrow, pygments, tango, espresso, zenburn, kate, monochrome, breezedark, haddock, atom-one, ayu, breeze, dracula, github, gruvbox, monokai, nord, oblivion, printing, radical, solarized, and vim. -->
+
+
+```{R}
+#| include: false
+knitr::read_chunk('r/2_plot_results.R')
+```
+
+
+\newpage
+
+# Set up
+
+## Packages
+
+
+```{R, libs}
+```
+
+## Load data
+
+
+```{R, load_dat}
+```
+
+
+
+
+\newpage
+
+# Methods
+
+## Data aquisition
+
+The data is thanks to [curtis-murray](https://github.com/curtis-murray) at his [MedicalDevicesNLP](https://github.com/curtis-murray/MedicalDevicesNLP) repo
+
+* Natural language processing of the TGA spontaneous reports of medical device database (DAEN)
+* Each record has an estimate of P(`topic == "pain"` | `Level`, `Doc`) using hierarchical stochastic block modelling (hSBM)
+* P(`topic == "pain"` | `Level`, `Doc`) estimates for each record are roughly interpreted as the proportion of the NLP analysed free text that is considered as using/describing words related to pain
+
+And example record and processing values:
+
+* [to include here]
+
+
+
+\newpage
+
+
+# Analysis choices:
+
+* Data structures - cumulative vs snapshot
+* Threshold choose
+* How many "looks"
+* how to choose alpha spending
+* sample size limitations for maxsprt 
+
+
+
+\newpage
+
+
+# Plots
+
+
+
+```{R, plot}
+#| fig.width: 7
+#| fig.height: 14
+```
+
+
+
+
+
+
+
+\newpage
+
+# Session information
+
+
+```{R}
+format(Sys.time(), '%d %b %Y')
+Sys.info() %>% as.data.frame(.)
+sessionInfo()
+```
+
+
+
+
+

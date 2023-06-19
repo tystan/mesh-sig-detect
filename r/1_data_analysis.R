@@ -1,5 +1,5 @@
 
-# ---- lib ----
+# ---- libs ----
 
 
 suppressPackageStartupMessages({
@@ -190,13 +190,13 @@ sra_cum_bcpnn <-
 
 # ---- end ----
 
-## close multisession workers by switching plan
-plan(sequential)
-
-
 
 sra_cum_bcpnn %>%
   write_parquet(., sink = "out/sra_cum_bcpnn.parquet")
+
+
+## close multisession workers by switching plan
+plan(sequential)
 
 
 

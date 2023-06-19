@@ -50,5 +50,6 @@ rsconnect/
 
 # ignore adhoc testing folder
 _test*
-
+# no previews of rendered README.md
+README.html 
 

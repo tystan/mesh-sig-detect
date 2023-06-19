@@ -1,5 +1,5 @@
 
-# ---- lib ----
+# ---- libs ----
 
 
 suppressPackageStartupMessages({
@@ -12,6 +12,7 @@ suppressPackageStartupMessages({
   library("ggrepel") 
   library("knitr")
   library("gsDesign")
+  library("arrow")
 })
 
 
