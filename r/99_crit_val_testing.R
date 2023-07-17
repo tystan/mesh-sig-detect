@@ -9,6 +9,7 @@ library("foreach")
 library("EmpiricalCalibration")
 library("Sequential")
 library("arrow")
+library("ggplot2")
 
 
 # ---- consts ----
@@ -24,12 +25,82 @@ cv_df_0 <-
   )
 
 ### testing
-# cv_df_0 <- 
+# cv_df_0 <-
 #   expand_grid(
 #     cntl_to_case_ratio = c(0.5, 2, 5),
-#     max_n = 200, 
+#     max_n = 200,
 #     look_interval = c(5, 10)
 #   )
+
+# ---- example_cv ----
+
+look_i <- 10
+max_n_i <- 200
+z_i <- 2
+
+
+# has to be per period (not cumulative) for Sequential::CV.Binomial()
+# (and EmpiricalCalibration::computeCvBinomial())
+# i.e. test performed at 3 events then when 4 more events come in requires
+# GroupSizes = c(3, 4)
+### NOT: GroupSizes = c(3, 7)
+gs_seq <- rep(look_i, floor(max_n_i / look_i))
+if (sum(gs_seq) != max_n_i) { # if doesn't go to max_n, add at end for last look
+  gs_seq <- c(gs_seq, max_n_i - sum(gs_seq)) 
+}
+gs_seq
+
+# both of the below take ~ 6 sec
+tic()
+Sequential::CV.Binomial(
+  N = max_n_i,
+  alpha = alpha,
+  M = min_event,
+  z = z_i, 
+  GroupSizes = gs_seq
+)
+toc()
+
+
+tic()
+EmpiricalCalibration::computeCvBinomial(
+  groupSizes = gs_seq,
+  z = z_i,
+  minimumEvents = 1,
+  alpha = 0.05, # does two-tailed by default? (no)
+  sampleSize = 1e+06
+)
+toc()
+
+# ---- example_cv2 ----
+
+look_i <- 10
+max_n_i <- 10000
+z_i <- 2
+
+
+# has to be per period (not cumulative) for Sequential::CV.Binomial()
+# (and EmpiricalCalibration::computeCvBinomial())
+# i.e. test performed at 3 events then when 4 more events come in requires
+# GroupSizes = c(3, 4)
+### NOT: GroupSizes = c(3, 7)
+gs_seq <- rep(look_i, floor(max_n_i / look_i))
+if (sum(gs_seq) != max_n_i) { # if doesn't go to max_n, add at end for last look
+  gs_seq <- c(gs_seq, max_n_i - sum(gs_seq)) 
+}
+gs_seq
+
+# takes ~ 5 min but Sequential::CV.Binomial()
+# warns against using for sum(groupSizes) > 500
+tic()
+EmpiricalCalibration::computeCvBinomial(
+  groupSizes = gs_seq,
+  z = z_i,
+  minimumEvents = 1,
+  alpha = 0.05, # does two-tailed by default?
+  sampleSize = 1e+06
+)
+toc()
 
 
 # ---- seq_package ----
@@ -44,16 +115,16 @@ cv_df_seq
 
 
 
-tic()
+tic() # takes 5 min 
 for (i in 1:nrow(cv_df_seq)) {
   
   look_i <- cv_df_seq$look_interval[i] 
   max_n_i <- cv_df_seq$max_n[i]
   z_i <- cv_df_seq$cntl_to_case_ratio[i]
   
-  # has to be cumulative for Sequential::CV.Binomial()
+  # has to be per period (not cumulative) for Sequential::CV.Binomial()
   # i.e. test performed at 3 events then when 3 more events come in requires
-  # GroupSizes = c(3, 6)
+  # GroupSizes = c(3, 3)
   gs_seq <- rep(look_i, floor(max_n_i / look_i))
   if (sum(gs_seq) != max_n_i) { # if doesn't go to max_n, add at end for last look
     gs_seq <- c(gs_seq, max_n_i - sum(gs_seq)) 
@@ -89,7 +160,7 @@ cv_df_ec$pack <- "EmpiricalCalibration"
 cv_df_ec
 
 
-tic()
+tic() # takes 4 hours using sampleSize = 1e+07
 for (i in 1:nrow(cv_df_ec)) {
   
   look_i <- cv_df_ec$look_interval[i] 
@@ -99,9 +170,9 @@ for (i in 1:nrow(cv_df_ec)) {
   # has to be per period (not cumulative) for EmpiricalCalibration::computeCvBinomial()
   # i.e. test performed at 3 events then when 3 more events come in requires
   # GroupSizes = c(3, 3)
-  gs_seq <- seq(look_i, max_n_i, by = look_i)
-  if (max(gs_seq) != max_n_i) { # if doesn't go to max_n, add at end for last look
-    gs_seq <- c(gs_seq, max_n_i) 
+  gs_seq <- rep(look_i, floor(max_n_i / look_i))
+  if (sum(gs_seq) != max_n_i) { # if doesn't go to max_n, add at end for last look
+    gs_seq <- c(gs_seq, max_n_i - sum(gs_seq)) 
   }
   
   cv_df_ec$cv[i] <- 
@@ -110,7 +181,7 @@ for (i in 1:nrow(cv_df_ec)) {
       z = z_i,
       minimumEvents = min_event,
       alpha = alpha,
-      sampleSize = 1e+07
+      sampleSize = 1e+06
     )
   
 }
@@ -127,54 +198,75 @@ cv_df_ec %>%
 
 # ---- compare ----
 
-inner_join(
-  cv_df_ec,
-  cv_df_seq,
-  c("cntl_to_case_ratio", "max_n", "look_interval")
-) %>%
+cv_df <-
+  bind_rows(
+    read_parquet("out/cv_df_ec.parquet"),
+    read_parquet("out/cv_df_seq.parquet")
+  ) 
+
+
+
+cv_df %>%
   mutate(
-    cv_diff = cv.x - cv.y,
-    rel_cv_diff = cv_diff / ((cv.x - cv.y) / 2)
+    cv_txt = sprintf("%1.1f", cv)
+  ) %>%
+  ggplot(., aes(x = factor(look_interval), y = cntl_to_case_ratio)) +
+  geom_tile(aes(fill = cv)) +
+  geom_text(aes(label = cv_txt)) +
+  facet_wrap(~ pack) +
+  scale_fill_viridis_b() +
+  labs(
+    x = expression(paste(
+      "Group sequential testing: expected number of events between tests: ", 
+      (a[t] - a[t-1]) + (c[t] - c[t-1]), 
+      ")"
+    )),
+    y = expression(paste(
+      "z (control:case ratio = ", 
+      (c[t] + d[t]) / (a[t] + b[t])
+    )),
+    fill = "maxSPRT\ncritical\nvalue",
+    label = "maxSPRT\ncritical\nvalue",
+  ) +
+  theme_bw()
+
+
+cv_df_w <-
+  cv_df %>%
+  pivot_wider(
+    .,
+    id_cols = all_of(c("cntl_to_case_ratio", "max_n", "look_interval")),
+    names_from = "pack",
+    values_from = "cv"
+  ) %>%
+  mutate(
+    cv_diff = EmpiricalCalibration - Sequential,
+    rel_cv_diff = cv_diff / ((EmpiricalCalibration + Sequential) / 2)
   )
 
 
-# ---- maxsprt_calcs ----
-
-max_sprt_stat <- function(c_n, n, z) {
-  
-  # the simple version of this equation is on page 70/71 of
-  # Kulldorf et al. (2011) A Maximized Sequential Probability Ratio Test for
-  # Drug and Vaccine Safety Surveillance. Sequential Analysis, 30(1): 58-78.
-  RR0 <- 1 # null hypoth RR
-  z_rr <- z / RR0
-  if ((z_rr) * c_n / (n - c_n) <= 1) {
-    max_llr <- 0
-  } else if (c_n == n) {
-    max_llr <- n * log(1 + z_rr)
-  } else {
-    max_llr <- 
-      c_n * log(c_n / n) + 
-      (n - c_n) * log((n - c_n) / n) - 
-      c_n * log(1 / (z_rr + 1)) - 
-      (n - c_n) * log(z_rr / (z_rr + 1))
-  }
-  return(max_llr)
-  
-}
+cv_df_w %>%
+  select(
+    `max n` = max_n,
+    `z=E[cntl:case]` = cntl_to_case_ratio,
+    `events per look` = look_interval,
+    empcalib = EmpiricalCalibration,
+    seq = Sequential,
+    diff = cv_diff,
+    `std diff` = rel_cv_diff
+  ) %>%
+  knitr::kable(., digits = 2)
 
 
-rr_est <- function(c_n, n, z) {
-  return(z * c_n / (n - c_n))
-}
-
-E_case <- function(c_n, n, z) {
-  return(z * c_n / (n - c_n))
-}
-
-max_sprt_stat(4, 5, (1 + 10) / (4 + 12))
-rr_est(4, 5, (1 + 10) / (4 + 12))
-max_sprt_stat(7, 9, (11 + 6) / (16 + 6))
-rr_est(7, 9, (11 + 6) / (16 + 6))
+# cv_df_w %>%
+#   mutate(
+#     rel_cv_diff_txt = sprintf("%0.3f", rel_cv_diff)
+#   ) %>%
+#   ggplot(., aes(x = factor(look_interval), y = cntl_to_case_ratio)) +
+#   geom_tile(aes(fill = rel_cv_diff)) +
+#   geom_text(aes(label = rel_cv_diff_txt)) +
+#   scale_fill_viridis_b(option = "B") +
+#   theme_bw()
 
 
 

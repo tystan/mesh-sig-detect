@@ -190,5 +190,50 @@ get_signal_dat <-
 
 
 
+# ---- maxsprt_calcs ----
+
+
+# null hypoth RR: RR0 = 1 
+max_sprt_stat <- function(c_n, n, z, RR0 = 1) {
+  
+  # the simple version of this equation is on page 70/71 of
+  # Kulldorf et al. (2011) A Maximized Sequential Probability Ratio Test for
+  # Drug and Vaccine Safety Surveillance. Sequential Analysis, 30(1): 58-78.
+  
+  z_rr <- z / RR0
+  if ((z_rr) * c_n / (n - c_n) <= 1) {
+    max_llr <- 0
+  } else if (c_n == n) {
+    max_llr <- n * log(1 + z_rr)
+  } else {
+    max_llr <- 
+      c_n * log(c_n / n) + 
+      (n - c_n) * log((n - c_n) / n) - 
+      c_n * log(1 / (z_rr + 1)) - 
+      (n - c_n) * log(z_rr / (z_rr + 1))
+  }
+  return(max_llr)
+  
+}
+
+
+rr_est <- function(c_n, n, z) {
+  return(z * c_n / (n - c_n))
+}
+
+E_case <- function(c_n, n, z) {
+  return(z * c_n / (n - c_n))
+}
+
+max_sprt_stat(4, 5, (1 + 10) / (4 + 12))
+rr_est(4, 5, (1 + 10) / (4 + 12))
+max_sprt_stat(7, 9, (11 + 6) / (16 + 6))
+rr_est(7, 9, (11 + 6) / (16 + 6))
+
+
+
+
+
+
 
 

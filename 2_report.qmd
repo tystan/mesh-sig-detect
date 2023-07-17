@@ -60,13 +60,84 @@ And example record and processing values:
 \newpage
 
 
+# The signal detection statistics over time
+
+We will consider the three signal detection statistics below:
+
+* Reporting Odds Ratio (ROR),
+* Bayesian Confidence Propagation Neural Network Information Component (BCPNN IC with MCMC CIs), and
+* the maxSPRT statistic
+
+However, first let's outline the data available.
+
+
+## Data
+
+
+Signal detection of disproportionate adverse events (AEs) will often have tabulated count data accumulated over time. The data at time point $t$ can be summarised as below:
+
+|         | AE(s) $X$| AE(s) $\bar{X}$ |
+|:--------|---------:|----------:|
+|Target exposure|       $a_t$|        $b_t$|
+|Comparator exposure|       $c_t$|        $d_t$|
+
+where
+
+* AE(s) $X$ is the set of AEs (or singular AE) of interest, 
+* AE(s) $\bar{X}$ is the complementary set to the AEs of interest, 
+* *Target exposure* is the medical device(s) of interest,  
+* *Comparator exposure* is the medical devices to which the *Target exposure* is being compared, and 
+* $a_t$, $b_t$, $c_t$ and $d_t$ (all $\in \mathbb{Z}^{+}$) are the respective counts of AEs recorded up until (i.e., cumulative) time $t$.
+
+In the mativating example of the pelvic mesh device, the contingengy table can be written more specifically as
+
+
+|         | AEs pain| AEs not pain |
+|:--------|---------:|----------:|
+|Pelvic mesh|       $a_t$|        $b_t$|
+|Comparator exposure|       $c_t$|        $d_t$|
+
+
+where 
+
+* *AEs pain* is the count of AEs that contain "pain" themes greater or equal to some pre-specified threshold $p_t \in (0,1)$ as estimated by the hSBM (that is, $P(\texttt{topic == "pain"} | \texttt{Level, Doc}) \geq p_t$), and
+* *Comparator exposure* can be any relevant set of medical devices to compare the pelvic mesh to (e.g., hernia mesh or all other mesh devices or all other devices).
+
+
+## Reporting odds ratio (ROR)
+
+
+ROR with $100(1-\alpha/2)$\% confidence intervals 
+
+$$
+\hat{\text{ROR}} = \frac{\frac{a_t}{a_t + b_t}}{\frac{c_t}{c_t+d_t}}
+$$
+
+
+
+## BCPNN IC
+
+BCPNN IC using the *maximum a posteriori* (m.a.p.) central estimate of the IC with MCMC simulation of the exact empirical distribution for $100(1-\alpha/2)$\% confidence (credible) regions of [Noren (2006)](https://doi.org/10.1002/sim.2473)
+
+
+## maxSPRT
+
+
+The maximised log-likelihood ratio statistic
+
+
+
+
+\newpage
+
+
 # Analysis choices:
 
 * Data structures - cumulative vs snapshot
 * Threshold choose
 * How many "looks"
 * how to choose alpha spending
-* sample size limitations for maxsprt 
+* sample size limitations for maxsprt - not an issue now can use MCMC method of `EmpiricalCalibration`
 
 
 
