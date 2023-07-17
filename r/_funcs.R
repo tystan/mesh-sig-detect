@@ -217,12 +217,18 @@ max_sprt_stat <- function(c_n, n, z, RR0 = 1) {
 }
 
 
+max_sprt_stat_ <- Vectorize(max_sprt_stat)
+
 rr_est <- function(c_n, n, z) {
   return(z * c_n / (n - c_n))
 }
 
+rr_est_ <- Vectorize(rr_est)
+
+
 E_case <- function(c_n, n, z) {
-  return(z * c_n / (n - c_n))
+  # return(z * c_n / (n - c_n))
+  return(NULL)
 }
 
 max_sprt_stat(4, 5, (1 + 10) / (4 + 12))
@@ -233,6 +239,40 @@ rr_est(7, 9, (11 + 6) / (16 + 6))
 
 
 
+
+get_maxsprt_cv <- function(max_n, per_look, z, alpha = 0.05, min_events = 1) {
+  
+  # has to be per period (not cumulative) for Sequential::CV.Binomial()
+  # i.e. test performed at 3 events then when 3 more events come in requires
+  # GroupSizes = c(3, 3)
+  gs_seq <- rep(per_look, floor(max_n / per_look))
+  if (sum(gs_seq) != max_n) { # if doesn't go to max_n, add at end for last look
+    gs_seq <- c(gs_seq, max_n - sum(gs_seq)) 
+  }
+  
+  if (max_n <= 500) {
+    return(
+      Sequential::CV.Binomial(
+        N = max_n,
+        alpha = alpha,
+        M = min_events,
+        z = z, 
+        GroupSizes = gs_seq
+      )$cv
+    )
+  } else { # for larger max n, use the sampling approach to get CV
+    return(
+      EmpiricalCalibration::computeCvBinomial(
+        groupSizes = gs_seq,
+        z = z,
+        minimumEvents = min_events,
+        alpha = alpha,
+        sampleSize = 1e+06
+      )
+    )
+  }
+  
+}
 
 
 

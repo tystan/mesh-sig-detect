@@ -75,7 +75,7 @@ toc()
 # ---- example_cv2 ----
 
 look_i <- 10
-max_n_i <- 10000
+max_n_i <- 4000
 z_i <- 2
 
 
@@ -90,7 +90,7 @@ if (sum(gs_seq) != max_n_i) { # if doesn't go to max_n, add at end for last look
 }
 gs_seq
 
-# takes ~ 5 min but Sequential::CV.Binomial()
+# takes ~ 2 min but Sequential::CV.Binomial()
 # warns against using for sum(groupSizes) > 500
 tic()
 EmpiricalCalibration::computeCvBinomial(
@@ -101,6 +101,7 @@ EmpiricalCalibration::computeCvBinomial(
   sampleSize = 1e+06
 )
 toc()
+### 103.83 sec elapsed
 
 
 # ---- seq_package ----

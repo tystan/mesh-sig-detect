@@ -57,6 +57,7 @@ toc() # ~2 sec
 set.seed(1234) 
 # this seed can be set in future_map() etc for reproducible parallel comp seeds 
 furrr_seed1 <- furrr_options(seed = 5678)
+furrr_seed2 <- furrr_options(seed = 9012)
 
 
 # ---- consts ----
@@ -203,20 +204,6 @@ plan(sequential)
 
 
 
-
-# ---- maxsprt ----
-
-sra_snp <- 
-  sra_dat %>%
-  dplyr::filter(dat_type == "snapshot")
-
-
-
-
-
-
-
-
 # ---- multcomp ----
 
 dat11 <-
@@ -295,6 +282,93 @@ bcpnn_mult_comp_signif <-
     est_name = paste0(est_name, "(MCadj)")
   )
 
+
+
+
+# ---- maxsprt ----
+
+
+sra_cum <- 
+  sra_dat %>%
+  dplyr::filter(dat_type == "cumulative") 
+
+cv_tab <-
+  sra_cum %>%
+  dplyr::filter(thresh < 0.070) %>%
+  group_by(grps, thresh) %>%
+  summarise(
+    min_dte = min(mnth),
+    max_dte = max(mnth),
+    rows = n(),
+    sum_nA = max(nA),
+    sum_nC = max(nC),
+    tot_n = sum_nA + sum_nC,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    qtrs = interval(paste0(min_dte, "-01"), paste0(max_dte, "-01")) / months(1) / 4,
+    n_per_qtr = tot_n / qtrs,
+    z = sum_nC / sum_nA
+  ) 
+
+cv_tab %>%
+  kable(., digits = 1)
+
+
+
+
+
+# testing/example
+row_i <- 1
+cv_tab[row_i, ]
+get_maxsprt_cv(cv_tab$tot_n[row_i], floor(cv_tab$n_per_qtr[row_i]), cv_tab$z[row_i])
+
+row_i <- 50
+cv_tab[row_i, ]
+get_maxsprt_cv(cv_tab$tot_n[row_i], floor(cv_tab$n_per_qtr[row_i]), cv_tab$z[row_i])
+
+
+
+
+### takes ~ 1 min
+tic()
+cv_tab <-
+  cv_tab %>%
+  # dplyr::filter(row_number() < 7) %>% ### testing
+  mutate(
+    cv =
+      future_pmap_dbl(
+        .l = list(tot_n, floor(n_per_qtr), z),
+        .f = ~get_maxsprt_cv(..1, ..2, ..3),
+        .options = furrr_seed2
+      )
+  )
+toc()
+
+
+
+maxsprt_dat <-
+  sra_cum %>%
+  mutate(
+    maxllr = max_sprt_stat_(c_n = nA, n = nA + nC, z = (nC + nD) / (nA + nB)),
+    rre = rr_est_(c_n = nA, n = nA + nC, z = (nC + nD) / (nA + nB))
+  )
+
+
+
+maxsprt_dat <-
+  maxsprt_dat %>%
+  inner_join(
+    .,
+    cv_tab %>% select(grps, thresh, cv),
+    c("grps", "thresh")
+  ) %>%
+  mutate(reached_cv = as.integer(maxllr > cv))
+
+
+maxsprt_dat %>%
+  select(-dat_type) %>%
+  print(., n = 25)
 
 
 
