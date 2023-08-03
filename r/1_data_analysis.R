@@ -128,10 +128,10 @@ get_sig_tab_over_time_2 <- function(dat, n_mcmc = 1e+05) {
 
 
 
-sra_dat <- read_parquet("dat/sra_dat.parquet")
+sra_dat <- read_parquet("dat/sra_dat.parquet") ### monthly
 cumul_qtrly_dat <- read_parquet("dat/cumul_qtrly_dat.parquet")
 
-thresholds <- sort(unique(sra_dat$thresh))
+(thresholds <- sort(unique(sra_dat$thresh)))
 
 
 
@@ -142,10 +142,9 @@ thresholds <- sort(unique(sra_dat$thresh))
 
 
 
-# sra_cum <- 
-#   sra_dat %>%
-#   dplyr::filter(dat_type == "cumulative") 
-sra_cum <- 
+
+
+sra_cum <-
   cumul_qtrly_dat
 
 # make data for each combination of params nested for purrr like processing
@@ -153,14 +152,22 @@ sra_cum <-
   sra_cum %>%
   nest(data = c(mnth, nA, nB, nC, nD))
 
+sra_cum2 <-
+  sra_dat %>%
+  dplyr::filter(dat_type == "cumulative") %>%
+  nest(data = c(mnth, nA, nB, nC, nD))
+
+
 # testing/example
-sra_cum$data[[1]]
-get_sig_tab_over_time(sra_cum$data[[1]])
+sra_cum$data[[9]] %>% print(., n = nrow(.))
+sra_cum2$data[[9]] %>% print(., n = nrow(.))
+get_sig_tab_over_time(sra_cum$data[[9]])
 
 
 
 
-### takes ~ 90 sec
+### takes ~ 90 sec for monthly
+### takes ~ 40 sec for quarterly
 tic()
 sra_cum <-
   sra_cum %>%
@@ -175,13 +182,21 @@ sra_cum <-
 toc()
 
 # check
-sra_cum$sig_tab[[1]]
+sra_cum$sig_tab[[9]]
 
 
 sra_cum_bcpnn <-
   sra_cum %>%
   unnest(cols = c(data, sig_tab)) %>%
-  mutate(dte = as_date(paste0(mnth, "-01")))
+  mutate(
+    # dte = as_date(paste0(mnth, "-01"))
+    dte = 
+      as_date(paste0(
+        substr(mnth, 1, 5),
+        sprintf("%02.0f", (as.integer(substr(mnth, 7, 7)) - 1) * 3 + 1),
+        "-01"
+      ))
+  )
 
 sra_cum_bcpnn
 
@@ -303,7 +318,15 @@ sra_cum$sig_tab[[1]]
 sra_cum_bcpnn_mc_adj <-
   sra_cum %>%
   unnest(cols = c(data, sig_tab)) %>%
-  mutate(dte = as_date(paste0(mnth, "-01")))
+  mutate(
+    # dte = as_date(paste0(mnth, "-01"))
+    dte = 
+      as_date(paste0(
+        substr(mnth, 1, 5),
+        sprintf("%02.0f", (as.integer(substr(mnth, 7, 7)) - 1) * 3 + 1),
+        "-01"
+      ))
+  )
 
 sra_cum_bcpnn_mc_adj
 
@@ -377,7 +400,8 @@ cv_tab <-
     .groups = "drop"
   ) %>%
   mutate(
-    qtrs = interval(paste0(min_dte, "-01"), paste0(max_dte, "-01")) / months(1) / 4,
+    # qtrs = interval(paste0(min_dte, "-01"), paste0(max_dte, "-01")) / months(1) / 4,
+    qtrs = rows,
     n_per_qtr = tot_n / qtrs,
     z = sum_nC / sum_nA
   ) 
@@ -443,6 +467,12 @@ maxsprt_dat <-
 maxsprt_dat %>%
   select(-dat_type) %>%
   print(., n = 25)
+
+# ---- save3 ----
+
+
+maxsprt_dat %>%
+  write_parquet(., sink = "out/sra_cum_maxsprt.parquet")
 
 
 

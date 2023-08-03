@@ -27,7 +27,7 @@ arbitrary_cell_min <- 1
 
 # these are the thresholds for pain_topic to be pain == TRUE
 # thresholds <- c(0.010, 0.025, 0.05, 0.075, 0.100, 0.150) 
-thresholds <- seq(0.010, 0.100, by = 0.005) 
+(thresholds <- sprintf("%1.3f", seq(0.010, 0.100, by = 0.005)))
 
 
 col_pal <- c("cyan4", "darkorange", "purple", "dodgerblue")
@@ -52,7 +52,47 @@ compar_lst <-
   )
 
 
+# ---- funcs ----
 
+create_qtr_range <- function(start_qtr, end_qtr) {
+  s_yr <- as.integer(substr(start_qtr, 1, 4))
+  s_qr <- as.integer(substr(start_qtr, 7, 7))
+  e_yr <- as.integer(substr(end_qtr, 1, 4))
+  e_qr <- as.integer(substr(end_qtr, 7, 7))
+  
+  qtr_vec <- NULL
+  if (s_yr > e_yr) {
+    stop("End year must not be before start year")
+  } else if ((s_yr == e_yr) & (s_qr > e_qr)) {
+    stop("End quarter must not come before start quarter")
+  } else if (s_yr == e_yr) {
+    qtr_vec <- paste0(s_yr, "-Q", s_qr:e_qr)
+  } else if (s_yr == (e_yr - 1)) {
+    qtr_vec <- 
+      c(
+        paste0(s_yr, "-Q", s_qr:4), 
+        paste0(e_yr, "-Q", 1:e_qr)
+      )
+  } else {
+    yr_diff <- e_yr - s_yr - 1
+    qtr_vec <- 
+      c(
+        paste0(s_yr, "-Q", s_qr:4), 
+        paste0((s_yr + 1):(e_yr - 1), "-Q", rep(1:4, yr_diff)), 
+        paste0(e_yr, "-Q", 1:e_qr)
+      )
+  }
+  
+  return(tibble(qtr = qtr_vec))
+  
+}
+# create_qtr_range("2013-Q2", "2012-Q4") ### eror tests
+# create_qtr_range("2013-Q2", "2013-Q1")
+create_qtr_range("2013-Q2", "2013-Q2")
+create_qtr_range("2013-Q2", "2013-Q3")
+create_qtr_range("2013-Q2", "2014-Q1")
+create_qtr_range("2013-Q2", "2015-Q1")
+create_qtr_range("2013-Q4", "2015-Q1")
 
 # ---- load_dat ----
 
@@ -186,7 +226,7 @@ cumul_dat <-
         g1 = target_lst[[i]],
         g2 = compar_lst[[i]],
         pain_type = "pain_topic", 
-        thresh = th_j,
+        thresh = as.numeric(th_j),
         cell_min = 1,
         cumul = TRUE,
         verbose = FALSE
@@ -194,6 +234,7 @@ cumul_dat <-
         mutate(
           grps = 
             paste0(
+              "(", letters[i], ") ",
               paste(target_lst[[i]], collapse = "/"), 
               " v ",
               paste(compar_lst[[i]], collapse = "/")
@@ -207,6 +248,7 @@ cumul_dat <-
   }
 cumul_dat
 
+
 # takes ~ 20 sec
 snpsh_dat <-
   foreach(i = 1:length(target_lst), .combine = bind_rows, .packages = "dplyr") %do% {
@@ -216,7 +258,7 @@ snpsh_dat <-
         g1 = target_lst[[i]],
         g2 = compar_lst[[i]],
         pain_type = "pain_topic", 
-        thresh = th_j,
+        thresh = as.numeric(th_j),
         cell_min = 1,
         cumul = FALSE,
         verbose = FALSE
@@ -224,6 +266,7 @@ snpsh_dat <-
         mutate(
           grps = 
             paste0(
+              "(", letters[i], ") ",
               paste(target_lst[[i]], collapse = "/"), 
               " v ",
               paste(compar_lst[[i]], collapse = "/")
@@ -338,45 +381,7 @@ cumul_qtrly_dat_summ <-
     .groups = "drop"
   )
 
-create_qtr_range <- function(start_qtr, end_qtr) {
-  s_yr <- as.integer(substr(start_qtr, 1, 4))
-  s_qr <- as.integer(substr(start_qtr, 7, 7))
-  e_yr <- as.integer(substr(end_qtr, 1, 4))
-  e_qr <- as.integer(substr(end_qtr, 7, 7))
-  
-  qtr_vec <- NULL
-  if (s_yr > e_yr) {
-    stop("End year must not be before start year")
-  } else if ((s_yr == e_yr) & (s_qr > e_qr)) {
-    stop("End quarter must not come before start quarter")
-  } else if (s_yr == e_yr) {
-    qtr_vec <- paste0(s_yr, "-Q", s_qr:e_qr)
-  } else if (s_yr == (e_yr - 1)) {
-    qtr_vec <- 
-      c(
-        paste0(s_yr, "-Q", s_qr:4), 
-        paste0(e_yr, "-Q", 1:e_qr)
-      )
-  } else {
-    yr_diff <- e_yr - s_yr - 1
-    qtr_vec <- 
-      c(
-        paste0(s_yr, "-Q", s_qr:4), 
-        paste0((s_yr + 1):(e_yr - 1), "-Q", rep(1:4, yr_diff)), 
-        paste0(e_yr, "-Q", 1:e_qr)
-      )
-  }
-  
-  return(tibble(qtr = qtr_vec))
-  
-}
-# create_qtr_range("2013-Q2", "2012-Q4") ### eror tests
-# create_qtr_range("2013-Q2", "2013-Q1")
-create_qtr_range("2013-Q2", "2013-Q2")
-create_qtr_range("2013-Q2", "2013-Q3")
-create_qtr_range("2013-Q2", "2014-Q1")
-create_qtr_range("2013-Q2", "2015-Q1")
-create_qtr_range("2013-Q4", "2015-Q1")
+
 
 cumul_qtrly_dat_summ
 
@@ -404,6 +409,7 @@ cumul_qtrly_dat <-
   cumul_qtrly_dat %>%
   arrange(grps, dat_type, thresh, mnth)
 
+cumul_qtrly_dat
 
 which_nas <- which(with(cumul_qtrly_dat, is.na(nA)))
 # problem children
@@ -420,7 +426,7 @@ cumul_qtrly_dat$nD[which_nas] <- cumul_qtrly_dat$nD[which_nas - 1]
 # fixed? (yes)
 cumul_qtrly_dat %>% dplyr::filter(row_number() %in% which_nas)
 
-
+cumul_dat %>% distinct(grps)
 
 # ---- export2 ----
 

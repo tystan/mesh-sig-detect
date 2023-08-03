@@ -36,6 +36,12 @@ knitr::read_chunk('r/0_preprocess.R')
 ```{R, consts}
 ```
 
+## Date function
+
+
+```{R, funcs}
+```
+
 
 \newpage
 
