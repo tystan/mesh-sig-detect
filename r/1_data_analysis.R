@@ -58,6 +58,7 @@ set.seed(1234)
 # this seed can be set in future_map() etc for reproducible parallel comp seeds 
 furrr_seed1 <- furrr_options(seed = 5678)
 furrr_seed2 <- furrr_options(seed = 9012)
+furrr_seed3 <- furrr_options(seed = 3456)
 
 
 # ---- consts ----
@@ -72,7 +73,7 @@ arbitrary_cell_min <- 1
 
 get_sig_tab <- function(nA, nB, nC, nD, alpha = 0.05, n_mcmc = 1e+05) {
   
-  out_cols_of_interest <- c("est_name", "est_scale", "est", "ci_lo", "ci_hi")
+  out_cols_of_interest <- c("est_name", "est_scale", "est", "alpha", "ci_lo", "ci_hi")
   sig_tab <- pharmsignal::bcpnn_mcmc_signal(nA, nB, nC, nD, alpha = alpha, n_mcmc = n_mcmc)
   sig_tab <- sig_tab[, out_cols_of_interest]
   # sig_tab <- bind_cols(tibble(mnth = mnth), sig_tab)
@@ -100,12 +101,38 @@ get_sig_tab_over_time <- function(dat, alpha = 0.05, n_mcmc = 1e+05) {
   
 }
 
+# same as get_sig_tab_over_time(), however, alpha assumed included as column in data
+get_sig_tab_over_time_2 <- function(dat, n_mcmc = 1e+05) {
+  
+  n_tp <- nrow(dat)
+  
+  sig_tab_over_time <-
+    foreach(i = 1:n_tp, .combine = bind_rows, .packages = "dplyr") %do% {
+      with(
+        dat, 
+        get_sig_tab(
+          # mnth[i], 
+          nA[i], nB[i], nC[i], nD[i], 
+          alpha = adj_alpha[i], 
+          n_mcmc = n_mcmc
+        )
+      )
+    }
+  
+  return(sig_tab_over_time)
+  
+}
+
 
 # ---- load_dat ----
 
 
 
 sra_dat <- read_parquet("dat/sra_dat.parquet")
+cumul_qtrly_dat <- read_parquet("dat/cumul_qtrly_dat.parquet")
+
+thresholds <- sort(unique(sra_dat$thresh))
+
 
 
 # ---- bcpnn_calcs ----
@@ -115,9 +142,11 @@ sra_dat <- read_parquet("dat/sra_dat.parquet")
 
 
 
+# sra_cum <- 
+#   sra_dat %>%
+#   dplyr::filter(dat_type == "cumulative") 
 sra_cum <- 
-  sra_dat %>%
-  dplyr::filter(dat_type == "cumulative") 
+  cumul_qtrly_dat
 
 # make data for each combination of params nested for purrr like processing
 sra_cum <-
@@ -189,98 +218,138 @@ sra_cum_bcpnn <-
 
 
 
-# ---- end ----
+# ---- save1 ----
 
 
 sra_cum_bcpnn %>%
   write_parquet(., sink = "out/sra_cum_bcpnn.parquet")
 
 
-## close multisession workers by switching plan
-plan(sequential)
 
 
 
 
 
+# ---- multcompar ----
 
-# ---- multcomp ----
+# sra_cum <- 
+#   sra_dat %>%
+#   dplyr::filter(dat_type == "cumulative") 
+sra_cum <- 
+  cumul_qtrly_dat
 
-dat11 <-
-  foreach(i = 1:length(thresholds), .combine = bind_rows, .packages = "dplyr") %do% {
-    
-    dat1 <-
-      get_signal_dat(
-        g1 = "pelvic_mesh",
-        g2 = "hernia_mesh",
-        pain_type = "pain_topic", 
-        thresh = thresholds[i],
-        cell_min = 1,
-        verbose = FALSE
-      ) %>%
-      bind_cols(., thresh = thresholds[i])
-    
-    
-    
-    
-    # so this is multiple comparisons central but let's create disproportionality stats
-    # whenever a new report enters the data
-    n_reports <- nrow(dat1)
-    
-    information_fracs <-  1:n_reports / n_reports
-    # spend_obj <- sfLDPocock(alpha = 0.025, t = information_fracs, param = NULL)
-    # spend_obj <- sfLDOF(alpha = 0.025, t = information_fracs, param = NULL)
-    spend_obj <- sfExponential(alpha = 0.05, t = information_fracs, param = 0.5)
-    
-    # plot(1:n_reports, spend_obj$spend, main = "alpha spending func", xlab = "look")
-    
-    
-    # takes ~1 sec using i5-8400
-    system.time({
-      da_stats <-
-        foreach(i = 1:n_reports, .combine = bind_rows, .packages = "dplyr") %dopar% {
-          with(
-            dat1, 
-            pretty_da(
-              mnth[i], thresh[i], nA[i], nB[i], nC[i], nD[i],
-              alpha = spend_obj$spend[i]
-            )
-          ) %>%
-            mutate(alpha = spend_obj$spend[i])
-        }
-    })
-    
-    dat1 <-
-      dat1 %>%
-      inner_join(
-        .,
-        da_stats,
-        c("mnth", "thresh")
+
+sra_cum <-
+  sra_cum %>%
+  nest(data = c(mnth, nA, nB, nC, nD))
+
+
+# if it's multiple comparisons central need to sparing use alpha
+get_mult_compare_adj_alpha <- function(dat) {
+  
+  n_reports <- nrow(dat)
+  
+  information_fracs <-  1:n_reports / n_reports
+  
+  ### alternatives:
+  # spend_obj <- sfLDPocock(alpha = 0.025, t = information_fracs, param = NULL)
+  # spend_obj <- sfLDOF(alpha = 0.025, t = information_fracs, param = NULL)
+  spend_obj <- sfExponential(alpha = 0.05, t = information_fracs, param = 0.5)
+  
+  # plot(1:n_reports, spend_obj$spend, main = "alpha spending func", xlab = "look")
+  
+  return(bind_cols(dat, adj_alpha = spend_obj$spend))
+
+}
+# test
+get_mult_compare_adj_alpha(sra_cum$data[[1]])
+get_sig_tab_over_time_2(get_mult_compare_adj_alpha(sra_cum$data[[1]]))
+
+tic()
+sra_cum <-
+  sra_cum %>%
+  mutate(
+    data = 
+      map(
+        .x = data, 
+        .f = get_mult_compare_adj_alpha
       )
-    
-    n_post_join <- nrow(dat1)
-    if (n_post_join != n_reports) {
-      stop("join not 1-1")
-    }
-    
-    dat1
-  }
+  )
+toc()
+
+# test
+sra_cum$data[[10]] # check adj_alpha added as column in data
+
+### takes ~ 100 sec
+tic()
+sra_cum <-
+  sra_cum %>%
+  mutate(
+    sig_tab = 
+      future_map(
+        .x = data, 
+        .f = get_sig_tab_over_time_2, # the alpha in data version
+        .options = furrr_seed1
+      )
+  )
+toc()
 
 
+
+# check
+sra_cum$sig_tab[[1]]
+
+
+sra_cum_bcpnn_mc_adj <-
+  sra_cum %>%
+  unnest(cols = c(data, sig_tab)) %>%
+  mutate(dte = as_date(paste0(mnth, "-01")))
+
+sra_cum_bcpnn_mc_adj
 
 
 # first signif
-bcpnn_mult_comp_signif <-
-  dat11 %>%
-  group_by(thresh) %>%
+bcpnn_mc_adj_signif <-
+  sra_cum_bcpnn_mc_adj %>%
+  group_by(grps, dat_type, thresh) %>%
   dplyr::filter(ci_lo > 0) %>%
-  arrange(mnth) %>%
+  arrange(dte) %>%
   dplyr::filter(row_number() == 1) %>%
   ungroup() %>%
-  mutate(
-    dte = as_date(paste0(mnth, "-01")),
-    est_name = paste0(est_name, "(MCadj)")
+  rename(dte_reach_sig = dte)
+
+
+nrow(sra_cum_bcpnn_mc_adj)
+sra_cum_bcpnn_mc_adj <-
+  left_join(
+    sra_cum_bcpnn_mc_adj,
+    bcpnn_signif %>% select(grps, dat_type, thresh, dte_reach_sig),
+    c("grps", "dat_type", "thresh")
   )
+nrow(sra_cum_bcpnn_mc_adj)
+
+sra_cum_bcpnn_mc_adj
+
+
+sra_cum_bcpnn_mc_adj <- 
+  sra_cum_bcpnn_mc_adj %>%
+  mutate(
+    dte_reach_sig = if_else(is.na(dte_reach_sig), as_date(today()), dte_reach_sig),
+    reach_sig = dte >= dte_reach_sig
+  )
+
+
+
+
+
+# ---- save2 ----
+
+
+sra_cum_bcpnn_mc_adj %>%
+  write_parquet(., sink = "out/sra_cum_bcpnn_mc_adj.parquet")
+
+
+
 
 
 
@@ -288,9 +357,11 @@ bcpnn_mult_comp_signif <-
 # ---- maxsprt ----
 
 
+# sra_cum <- 
+#   sra_dat %>%
+#   dplyr::filter(dat_type == "cumulative") 
 sra_cum <- 
-  sra_dat %>%
-  dplyr::filter(dat_type == "cumulative") 
+  cumul_qtrly_dat
 
 cv_tab <-
   sra_cum %>%
@@ -330,7 +401,7 @@ get_maxsprt_cv(cv_tab$tot_n[row_i], floor(cv_tab$n_per_qtr[row_i]), cv_tab$z[row
 
 
 
-### takes ~ 1 min
+### takes ~ 70 sec
 tic()
 cv_tab <-
   cv_tab %>%
@@ -340,10 +411,12 @@ cv_tab <-
       future_pmap_dbl(
         .l = list(tot_n, floor(n_per_qtr), z),
         .f = ~get_maxsprt_cv(..1, ..2, ..3),
-        .options = furrr_seed2
+        .options = furrr_seed3
       )
   )
 toc()
+
+cv_tab
 
 
 
@@ -354,6 +427,7 @@ maxsprt_dat <-
     rre = rr_est_(c_n = nA, n = nA + nC, z = (nC + nD) / (nA + nB))
   )
 
+# maxsprt_dat
 
 
 maxsprt_dat <-
@@ -372,4 +446,9 @@ maxsprt_dat %>%
 
 
 
+# ---- close_future ----
+
+
+## close multisession workers by switching plan
+plan(sequential)
 

@@ -67,9 +67,9 @@ knitr::read_chunk('r/0_preprocess.R')
 \newpage
 
 
-# Create data for analysis from raw data
+# Create (monthly) data for analysis from raw data
 
-## Creation of analysis data
+## Creation of analysis data 
 
 
 ```{R, create_analysis_data}
@@ -84,11 +84,26 @@ knitr::read_chunk('r/0_preprocess.R')
 ## Export analysis data
 
 
-```{R, export}
+```{R, export1}
 ```
 
 
+\newpage
 
+
+# Create (quarterly, complete) data for analysis from raw data
+
+## Creation of analysis data 
+
+
+```{R, create_quarterly_data}
+```
+
+## Export analysis data
+
+
+```{R, export2}
+```
 
 \newpage
 

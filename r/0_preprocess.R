@@ -7,6 +7,8 @@ suppressPackageStartupMessages({
   library("dplyr")
   library("tidyr")
   library("lubridate") # way to handle dates better than default R way
+  library("ggplot2") 
+  library("purrr") # map(), map2() functions etc 
   library("knitr")
   library("foreach")
   library("arrow") # read/write parquet files
@@ -282,9 +284,7 @@ inner_join(
 ) 
 
 
-
-
-# ---- export ----
+# ---- export1 ----
 
 
 # all spontaneous report analysis data
@@ -297,5 +297,135 @@ sra_dat <-
 sra_dat %>%
   write_parquet(., sink = "dat/sra_dat.parquet")
 
+
+
+
+
+# ---- create_quarterly_data ----
+
+cumul_qtrly_dat <-
+  cumul_dat %>%
+  mutate(
+    mnth_qtr = 
+      quarter(
+        as_date(paste0(mnth, "-01")),
+        type = "quarter"
+      ),
+    mnth_qtr = paste0(substr(mnth, 1, 5), "Q", as.character(mnth_qtr))
+  ) 
+
+cumul_qtrly_dat <-
+  cumul_qtrly_dat %>%
+  group_by(grps, dat_type, thresh, mnth_qtr) %>%
+  dplyr::filter(row_number() == n()) %>%
+  ungroup()
+
+cumul_qtrly_dat
+
+
+cumul_qtrly_dat <-
+  cumul_qtrly_dat %>%
+  mutate(mnth = mnth_qtr) %>%
+  select(-mnth_qtr)
+
+cumul_qtrly_dat_summ <-
+  cumul_qtrly_dat %>%
+  group_by(grps, dat_type, thresh) %>%
+  summarise(
+    min_dte = min(mnth),
+    max_dte = max(mnth),
+    n_row = n(),
+    .groups = "drop"
+  )
+
+create_qtr_range <- function(start_qtr, end_qtr) {
+  s_yr <- as.integer(substr(start_qtr, 1, 4))
+  s_qr <- as.integer(substr(start_qtr, 7, 7))
+  e_yr <- as.integer(substr(end_qtr, 1, 4))
+  e_qr <- as.integer(substr(end_qtr, 7, 7))
+  
+  qtr_vec <- NULL
+  if (s_yr > e_yr) {
+    stop("End year must not be before start year")
+  } else if ((s_yr == e_yr) & (s_qr > e_qr)) {
+    stop("End quarter must not come before start quarter")
+  } else if (s_yr == e_yr) {
+    qtr_vec <- paste0(s_yr, "-Q", s_qr:e_qr)
+  } else if (s_yr == (e_yr - 1)) {
+    qtr_vec <- 
+      c(
+        paste0(s_yr, "-Q", s_qr:4), 
+        paste0(e_yr, "-Q", 1:e_qr)
+      )
+  } else {
+    yr_diff <- e_yr - s_yr - 1
+    qtr_vec <- 
+      c(
+        paste0(s_yr, "-Q", s_qr:4), 
+        paste0((s_yr + 1):(e_yr - 1), "-Q", rep(1:4, yr_diff)), 
+        paste0(e_yr, "-Q", 1:e_qr)
+      )
+  }
+  
+  return(tibble(qtr = qtr_vec))
+  
+}
+# create_qtr_range("2013-Q2", "2012-Q4") ### eror tests
+# create_qtr_range("2013-Q2", "2013-Q1")
+create_qtr_range("2013-Q2", "2013-Q2")
+create_qtr_range("2013-Q2", "2013-Q3")
+create_qtr_range("2013-Q2", "2014-Q1")
+create_qtr_range("2013-Q2", "2015-Q1")
+create_qtr_range("2013-Q4", "2015-Q1")
+
+cumul_qtrly_dat_summ
+
+cumul_qtrly_dat_summ <-
+  cumul_qtrly_dat_summ %>%
+  mutate(
+    range = map2(.x = min_dte, .y = max_dte, .f = create_qtr_range)
+  ) %>%
+  unnest(cols = range)
+
+cumul_qtrly_dat_summ %>%
+  print(., n = 22)
+
+nrow(cumul_qtrly_dat)
+nrow(cumul_qtrly_dat_summ)
+cumul_qtrly_dat <-
+  left_join(
+    cumul_qtrly_dat_summ %>% select(grps, dat_type, thresh, mnth = qtr),
+    cumul_qtrly_dat,
+    c("grps", "dat_type", "thresh", "mnth")
+  )
+nrow(cumul_qtrly_dat)
+
+cumul_qtrly_dat <-
+  cumul_qtrly_dat %>%
+  arrange(grps, dat_type, thresh, mnth)
+
+
+which_nas <- which(with(cumul_qtrly_dat, is.na(nA)))
+# problem children
+cumul_qtrly_dat %>% dplyr::filter(row_number() %in% which_nas)
+# rows prior to problem children
+cumul_qtrly_dat %>% dplyr::filter(row_number() %in% (which_nas - 1))
+
+cumul_qtrly_dat$nA[which_nas] <- cumul_qtrly_dat$nA[which_nas - 1]
+# cumul_qtrly_dat %>% dplyr::filter(row_number() %in% which_nas)
+cumul_qtrly_dat$nB[which_nas] <- cumul_qtrly_dat$nB[which_nas - 1]
+cumul_qtrly_dat$nC[which_nas] <- cumul_qtrly_dat$nC[which_nas - 1]
+cumul_qtrly_dat$nD[which_nas] <- cumul_qtrly_dat$nD[which_nas - 1]
+
+# fixed? (yes)
+cumul_qtrly_dat %>% dplyr::filter(row_number() %in% which_nas)
+
+
+
+# ---- export2 ----
+
+
+cumul_qtrly_dat %>%
+  write_parquet(., sink = "dat/cumul_qtrly_dat.parquet")
 
 
