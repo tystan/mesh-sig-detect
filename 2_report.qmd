@@ -165,8 +165,9 @@ The maximised log-likelihood ratio statistic
 
 
 ```{R}
+# Sys.info()[!(names(Sys.info()) %in% c("login", "nodename"))] %>% 
+#   as.data.frame(.)
 format(Sys.time(), '%d %b %Y')
-Sys.info() %>% as.data.frame(.)
 sessionInfo()
 ```
 

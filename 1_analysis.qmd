@@ -87,8 +87,9 @@ knitr::read_chunk('r/1_data_analysis.R')
 
 
 ```{R}
+# Sys.info()[!(names(Sys.info()) %in% c("login", "nodename"))] %>% 
+#   as.data.frame(.)
 format(Sys.time(), '%d %b %Y')
-Sys.info() %>% as.data.frame(.)
 sessionInfo()
 ```
 

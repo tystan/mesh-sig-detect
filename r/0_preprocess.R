@@ -11,6 +11,7 @@ suppressPackageStartupMessages({
   library("purrr") # map(), map2() functions etc 
   library("knitr")
   library("foreach")
+  library("tictoc")
   library("arrow") # read/write parquet files
 })
 
@@ -182,15 +183,24 @@ clean_data %>%
   scale_fill_manual(values = col_pal[1:2]) +
   theme_bw()
 
+type_lvls <- c("pelvic_mesh", "hernia_mesh", "other_mesh", "other_device")
+
 clean_data %>% 
-  dplyr::filter(
-    type %in% c("pelvic_mesh", "hernia_mesh", "other_mesh", "other_device")
-  ) %>%
+  dplyr::filter(type %in% type_lvls) %>%
+  mutate(type = factor(type, levels = type_lvls)) %>%
   ggplot(., aes(pain_topic, fill = pain_word)) +
   geom_histogram(bins = 30) +
-  scale_fill_manual(values = col_pal[1:2]) +
+  scale_fill_manual(values = col_pal[2:1]) +
   facet_wrap(~ type, scales = "free_y") +
-  theme_bw()
+  theme_bw() +
+  labs(
+    x = "P(topic = 'pain' | document)",
+    y = "Frequency",
+    fill = "Pain word\npresent"
+  )
+
+
+ggsave(filename = "fig/pain_topic_dist.png", dpi = 900, width = 7, height = 4)
 
 
 # ---- create_analysis_data ----
@@ -218,6 +228,7 @@ clean_data %>%
 
 
 # takes ~ 20 sec
+tic()
 cumul_dat <-
   foreach(i = 1:length(target_lst), .combine = bind_rows, .packages = "dplyr") %do% {
     foreach(th_j = thresholds, .combine = bind_rows, .packages = "dplyr") %do% {
@@ -246,10 +257,12 @@ cumul_dat <-
       
     }
   }
+toc()
 cumul_dat
 
 
 # takes ~ 20 sec
+tic()
 snpsh_dat <-
   foreach(i = 1:length(target_lst), .combine = bind_rows, .packages = "dplyr") %do% {
     foreach(th_j = thresholds, .combine = bind_rows, .packages = "dplyr") %do% {
@@ -278,6 +291,7 @@ snpsh_dat <-
       
     }
   }
+toc()
 snpsh_dat
 
 

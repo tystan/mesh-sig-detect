@@ -20,6 +20,8 @@ suppressPackageStartupMessages({
 })
 
 
+
+
 # NOTE: need to run first (only once, assumes devtools installed):
 # devtools::install_github("tystan/pharmsignal") 
 library("pharmsignal") # signal detection algs
@@ -28,18 +30,22 @@ library("pharmsignal") # signal detection algs
 # they will be shown in the *Appendix A*
 source("r/_funcs.R")
 
+### NB: packages required that are used in above sourced file
+# Sequential
+# EmpiricalCalibration
 
 
 # ---- check_parallel_comp ----
 
 # options(future.globals.maxSize = 500 * 1024 ^ 2) # = 500 MiB
-options(future.globals.maxSize = 1e3 * 1024 ^ 2) # = 1 GB
+options(future.globals.maxSize = 2e3 * 1024 ^ 2) # = 2 GB
 
 
 
 # furrr parallel workers/cores setup
 # change `workers = 4` based on cores available in processor being used
-plan(multisession, workers = 4) 
+(thread_to_use <- parallel::detectCores() - 2) # keep a core = 2 threads free
+plan(multisession, workers = thread_to_use) 
 
 ### test parallel works
 # test code from https://furrr.futureverse.org/
@@ -52,6 +58,10 @@ tic()
 dev_null <- future_map(c(2, 2, 2), ~Sys.sleep(.x))
 toc() # ~2 sec
 
+# for fun
+tic()
+dev_null <- future_map(rep(2, thread_to_use), ~Sys.sleep(.x))
+toc()
 
 # this only applies to the non-parallel (non-"future") operations
 set.seed(1234) 
@@ -127,9 +137,11 @@ get_sig_tab_over_time_2 <- function(dat, n_mcmc = 1e+05) {
 # ---- load_dat ----
 
 
+### monthly for testing
+sra_dat <- read_parquet("dat/sra_dat.parquet") 
 
-sra_dat <- read_parquet("dat/sra_dat.parquet") ### monthly
-cumul_qtrly_dat <- read_parquet("dat/cumul_qtrly_dat.parquet")
+### want this
+cumul_qtrly_dat <- read_parquet("dat/cumul_qtrly_dat.parquet") 
 
 (thresholds <- sort(unique(sra_dat$thresh)))
 
@@ -165,9 +177,10 @@ get_sig_tab_over_time(sra_cum$data[[9]])
 
 
 
-
-### takes ~ 90 sec for monthly
-### takes ~ 40 sec for quarterly
+### for i5-8400/48GB 2133mhz memory
+# takes ~ 90 sec for monthly
+# takes ~ 40 sec for quarterly
+### divide by a fair bit for r9-7900X
 tic()
 sra_cum <-
   sra_cum %>%
@@ -295,7 +308,7 @@ toc()
 # test
 sra_cum$data[[10]] # check adj_alpha added as column in data
 
-### takes ~ 100 sec
+### takes ~ 100 sec (i5-8400)
 tic()
 sra_cum <-
   sra_cum %>%
@@ -388,7 +401,7 @@ sra_cum <-
 
 cv_tab <-
   sra_cum %>%
-  dplyr::filter(thresh < 0.070) %>%
+  # dplyr::filter(thresh < 0.070) %>%
   group_by(grps, thresh) %>%
   summarise(
     min_dte = min(mnth),
@@ -425,7 +438,11 @@ get_maxsprt_cv(cv_tab$tot_n[row_i], floor(cv_tab$n_per_qtr[row_i]), cv_tab$z[row
 
 
 
-### takes ~ 70 sec
+### takes ~ 70 sec (i5-8400)
+# note purrr::possibly() will just catch when model fails and return as.numeric(NA) 
+get_maxsprt_cv_poss <- 
+  possibly(get_maxsprt_cv, otherwise = NA_real_, quiet = FALSE)
+
 tic()
 cv_tab <-
   cv_tab %>%
@@ -434,14 +451,14 @@ cv_tab <-
     cv =
       future_pmap_dbl(
         .l = list(tot_n, floor(n_per_qtr), z),
-        .f = ~get_maxsprt_cv(..1, ..2, ..3),
+        .f = ~get_maxsprt_cv_poss(..1, ..2, ..3),
         .options = furrr_seed3
       )
   )
 toc()
 
 cv_tab
-
+cv_tab %>% dplyr::filter(is.na(cv))
 
 
 maxsprt_dat <-
@@ -456,17 +473,33 @@ maxsprt_dat <-
 
 maxsprt_dat <-
   maxsprt_dat %>%
-  inner_join(
+  left_join(
     .,
     cv_tab %>% select(grps, thresh, cv),
     c("grps", "thresh")
-  ) %>%
-  mutate(reached_cv = as.integer(maxllr > cv))
+  ) 
 
+maxsprt_dat <-
+  maxsprt_dat %>%
+  mutate(
+    # some cvs don't exist so those llr never reach cv
+    reached_cv = if_else(is.na(cv), 0L, as.integer(maxllr > cv)),
+    # create date for start of each quarter
+    dte = 
+      as_date(paste0(
+        substr(mnth, 1, 5),
+        sprintf("%02.0f", (as.integer(substr(mnth, 7, 7)) - 1) * 3 + 1),
+        "-01"
+      ))
+  )
 
+maxsprt_dat %>% dplyr::filter(is.na(cv))
+
+# have a peak
 maxsprt_dat %>%
   select(-dat_type) %>%
   print(., n = 25)
+
 
 # ---- save3 ----
 
