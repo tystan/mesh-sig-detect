@@ -56,7 +56,7 @@ toc() # ~6 sec
 # parallel: should be (roughly, plus overheads) a third of the time of sequential
 tic()
 dev_null <- future_map(c(2, 2, 2), ~Sys.sleep(.x))
-toc() # ~2 sec
+toc() # ~2 sec + overhead
 
 # for fun
 tic()
@@ -290,8 +290,9 @@ get_mult_compare_adj_alpha <- function(dat) {
 
 }
 # test
-get_mult_compare_adj_alpha(sra_cum$data[[1]])
-get_sig_tab_over_time_2(get_mult_compare_adj_alpha(sra_cum$data[[1]]))
+get_mult_compare_adj_alpha(sra_cum$data[[11]])
+get_sig_tab_over_time_2(get_mult_compare_adj_alpha(sra_cum$data[[11]]))
+get_sig_tab_over_time(sra_cum$data[[11]])
 
 tic()
 sra_cum <-
@@ -306,7 +307,7 @@ sra_cum <-
 toc()
 
 # test
-sra_cum$data[[10]] # check adj_alpha added as column in data
+sra_cum$data[[11]] # check adj_alpha added as column in data
 
 ### takes ~ 100 sec (i5-8400)
 tic()
@@ -325,7 +326,7 @@ toc()
 
 
 # check
-sra_cum$sig_tab[[1]]
+sra_cum$sig_tab[[11]]
 
 
 sra_cum_bcpnn_mc_adj <-
@@ -359,7 +360,7 @@ nrow(sra_cum_bcpnn_mc_adj)
 sra_cum_bcpnn_mc_adj <-
   left_join(
     sra_cum_bcpnn_mc_adj,
-    bcpnn_signif %>% select(grps, dat_type, thresh, dte_reach_sig),
+    bcpnn_mc_adj_signif %>% select(grps, dat_type, thresh, dte_reach_sig),
     c("grps", "dat_type", "thresh")
   )
 nrow(sra_cum_bcpnn_mc_adj)
@@ -499,6 +500,51 @@ maxsprt_dat %>% dplyr::filter(is.na(cv))
 maxsprt_dat %>%
   select(-dat_type) %>%
   print(., n = 25)
+
+
+# first signif
+maxsprt_signif <-
+  maxsprt_dat %>%
+  group_by(grps, dat_type, thresh) %>%
+  dplyr::filter(reached_cv > 0) %>%
+  arrange(dte) %>%
+  dplyr::filter(row_number() == 1) %>%
+  ungroup() %>%
+  rename(dte_reach_sig = dte)
+
+
+nrow(maxsprt_dat)
+maxsprt_dat <-
+  left_join(
+    maxsprt_dat,
+    maxsprt_signif %>% select(grps, dat_type, thresh, dte_reach_sig),
+    c("grps", "dat_type", "thresh")
+  )
+nrow(maxsprt_dat)
+
+maxsprt_dat
+
+
+maxsprt_dat <- 
+  maxsprt_dat %>%
+  mutate(
+    dte_reach_sig = if_else(is.na(dte_reach_sig), as_date(today()), dte_reach_sig),
+    reach_sig = dte >= dte_reach_sig
+  )
+
+# these are where the maxllr has dropped under the CV after exceeding it previously
+maxsprt_dat %>%
+  dplyr::filter(
+    is.na(reach_sig) | 
+      is.na(reached_cv) | 
+      (as.logical(reached_cv) != reach_sig)
+  )
+
+
+
+maxsprt_dat <- 
+  maxsprt_dat %>%
+  select(-reached_cv)
 
 
 # ---- save3 ----

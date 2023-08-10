@@ -8,6 +8,7 @@ suppressPackageStartupMessages({
   library("tidyr")
   library("lubridate") # way to handle dates better than default R way
   library("ggplot2") 
+  library("ggthemes") 
   library("purrr") # map(), map2() functions etc 
   library("knitr")
   library("foreach")
@@ -190,9 +191,11 @@ clean_data %>%
   mutate(type = factor(type, levels = type_lvls)) %>%
   ggplot(., aes(pain_topic, fill = pain_word)) +
   geom_histogram(bins = 30) +
-  scale_fill_manual(values = col_pal[2:1]) +
+  # scale_fill_manual(values = col_pal[2:1]) +
+  scale_fill_tableau(palette = "Color Blind", direction = 1) +
   facet_wrap(~ type, scales = "free_y") +
-  theme_bw() +
+  theme_bw() + 
+  theme(text = element_text(family = "serif")) +
   labs(
     x = "P(topic = 'pain' | document)",
     y = "Frequency",

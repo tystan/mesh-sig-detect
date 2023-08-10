@@ -148,12 +148,17 @@ The maximised log-likelihood ratio statistic
 
 
 
-```{R, plot}
+```{R, time_to_sig_plot}
 #| fig.width: 7
-#| fig.height: 14
+#| fig.height: 7
 ```
 
 
+
+```{R, stat_over_time_plot}
+#| fig.width: 7
+#| fig.height: 7
+```
 
 
 
