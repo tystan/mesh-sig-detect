@@ -8,6 +8,7 @@ suppressPackageStartupMessages({
   library("tidyr")
   library("forcats")
   library("lubridate") # way to handle dates better than default R way
+  library("stringr") 
   library("ggplot2") 
   library("ggthemes") 
   library("ggrepel") 
@@ -71,13 +72,16 @@ signif_plt <-
   ### only keep pelvic mesh as target vs whatever comparator
   dplyr::filter(grepl("^.*pelvic.* v ", grps)) %>%
   mutate(
-    grps = gsub(" v ", "\nv\n", grps),
     grps = gsub("\\([a-z]\\) ", "", grps),
     grps = gsub("_", " ", grps),
+    grps = gsub("pelvic mesh", "Pelvic mesh", grps),
+    grps = gsub("hernia mesh", "Hernia mesh", grps),
+    # grps = str_to_sentence(grps),
+    grps = gsub(" v ", "\nv\n", grps, fixed = TRUE),
     grps = fct_inorder(grps)
   ) 
 
-
+levels(signif_plt$grps)
 
 signif_plt %>%
   arrange(grps, thresh) %>%
