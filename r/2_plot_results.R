@@ -117,7 +117,7 @@ signif_plt %>%
   theme_bw() +
   theme(text = element_text(family = "serif")) +
   labs(
-    x = "Date H0 of no signal rejected",
+    x = expression("Date" ~ H[0] ~ "rejected (null hypothesis of no signal)"),
     y = "Threshold for P(topic = 'pain' | doc) to be classed a 'pain' adverse event",
     col = "Signal detection\nmethod"
   )
@@ -198,15 +198,15 @@ ggsave(
   dpi = 900, width = 10, height = 8
 )
 
-
+thresh_lablr <- function(string) paste0("P(topic = 'pain' | doc)\nthreshold: ", string)
 
 sra_stat_plt %>%
   dplyr::filter(stat != "BCPNN") %>%
   mutate(
     stat2 = 
       paste0(
-        ifelse(stat == "maxSPRT", "RR", "2^IC =\nP(Pain AE)P(Pelvic)/P(Pain AE & Pelvic)"), 
-        "\n(", stat, ")"
+        ifelse(stat == "maxSPRT", "RR", "2^IC =\nP(Pain AE & Pelvic)/{P(Pain AE)P(Pelvic)}"), 
+        "\n[", stat, "]"
       ),
     reach_sig_alpha = ifelse(reach_sig, 1, 0.8),
     `P(topic = 'pain') threshold` = thresh,
@@ -231,7 +231,7 @@ sra_stat_plt %>%
   geom_line() %+%
   geom_point() %+%
   # geom_ribbon(alpha = 0.05)  %+%
-  facet_wrap(~ `P(topic = 'pain') threshold`, nrow = 1, labeller = label_both) %+%
+  facet_wrap(~ thresh, nrow = 1, labeller = as_labeller(thresh_lablr)) %+%
   # facet_grid(
   #   `Statistic calculation method` ~ `P(topic = 'pain') threshold`, 
   #   labeller = label_both
@@ -240,12 +240,15 @@ sra_stat_plt %>%
     subtitle = "Pelvic mesh v hernia mesh",
     y = "Reporting ratio estimate",
     x = "Date (quarterly data accumulation)",
-    col = "Reporting ratio estimate\n(signal detection method)"
+    col = "Reporting ratio estimate\n[signal detection method]"
   ) %+%
   scale_y_continuous(trans = "log2") %+%
   scale_colour_manual(values = col_pal[-2])  %+%
   theme_bw() %+%
-  theme(text = element_text(family = "serif")) 
+  theme(
+    text = element_text(family = "serif"),
+    legend.key.height = unit(3, units = "line")
+  ) 
 
 
 ggsave(
