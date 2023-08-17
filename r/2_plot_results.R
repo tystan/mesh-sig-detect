@@ -91,7 +91,7 @@ signif_plt %>%
   theme_bw() +
   theme(text = element_text(family = "serif")) +
   labs(
-    x = "Date H0 of no signal rejected",
+    x = expression("Date" ~ H[0] ~ "rejected (null hypothesis of no signal)"),
     y = "Threshold for P(topic = 'pain' | doc) to be classed a 'pain' adverse event",
     col = "Signal detection\nmethod"
   )

@@ -10,6 +10,7 @@ suppressPackageStartupMessages({
   library("ggplot2") 
   library("ggthemes") 
   library("purrr") # map(), map2() functions etc 
+  library("stringr")
   library("knitr")
   library("foreach")
   library("tictoc")
@@ -185,10 +186,14 @@ clean_data %>%
   theme_bw()
 
 type_lvls <- c("pelvic_mesh", "hernia_mesh", "other_mesh", "other_device")
+type_lvls_edt <- str_to_sentence(str_replace_all(type_lvls, "_", " "))
 
 clean_data %>% 
   dplyr::filter(type %in% type_lvls) %>%
-  mutate(type = factor(type, levels = type_lvls)) %>%
+  mutate(
+    type = str_to_sentence(str_replace_all(type, "_", " ")),
+    type = factor(type, levels = type_lvls_edt)
+  ) %>%
   ggplot(., aes(pain_topic, fill = pain_word)) +
   geom_histogram(bins = 30) +
   # scale_fill_manual(values = col_pal[2:1]) +
