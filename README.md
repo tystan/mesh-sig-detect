@@ -1,6 +1,9 @@
 # mesh-sig-detect
 Time to signal analysis for spontaneous report data on pelvic mesh medical device
 
+![](https://github.com/tystan/mesh-sig-detect/blob/main/fig/pelvic_v_hernia_sig_detect_over_time.png)
+
+
 # Data source
 
 The data is thanks to [curtis-murray](https://github.com/curtis-murray) at his [MedicalDevicesNLP](https://github.com/curtis-murray/MedicalDevicesNLP) repo 
