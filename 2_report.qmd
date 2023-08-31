@@ -60,18 +60,10 @@ And example record and processing values:
 \newpage
 
 
-# The signal detection statistics over time
-
-We will consider the three signal detection statistics below:
-
-* Reporting Odds Ratio (ROR),
-* Bayesian Confidence Propagation Neural Network Information Component (BCPNN IC with MCMC CIs), and
-* the maxSPRT statistic
-
-However, first let's outline the data available.
 
 
-## Data
+
+## Analysis data
 
 
 Signal detection of disproportionate adverse events (AEs) will often have tabulated count data accumulated over time. The data at time point $t$ can be summarised as below:
@@ -89,7 +81,7 @@ where
 * *Comparator exposure* is the medical devices to which the *Target exposure* is being compared, and 
 * $a_t$, $b_t$, $c_t$ and $d_t$ (all $\in \mathbb{Z}^{+}$) are the respective counts of AEs recorded up until (i.e., cumulative) time $t$.
 
-In the mativating example of the pelvic mesh device, the contingengy table can be written more specifically as
+In the motivating example of the pelvic mesh device, the contingency table can be written more specifically as
 
 
 |         | AEs pain| AEs not pain |
@@ -103,15 +95,51 @@ where
 * *AEs pain* is the count of AEs that contain "pain" themes greater or equal to some pre-specified threshold $p_t \in (0,1)$ as estimated by the hSBM (that is, $P(\texttt{topic == "pain"} | \texttt{Level, Doc}) \geq p_t$), and
 * *Comparator exposure* can be any relevant set of medical devices to compare the pelvic mesh to (e.g., hernia mesh or all other mesh devices or all other devices).
 
+# The signal detection statistics over time
 
-## Reporting odds ratio (ROR)
+We will consider the three signal detection statistics below:
+
+* Proportional reporting ratio (PRR),
+* Bayesian Confidence Propagation Neural Network Information Component (BCPNN IC with MCMC CIs), and
+* the maxSPRT statistic
 
 
-ROR with $100(1-\alpha/2)$\% confidence intervals 
+As signal detection is being undertaken repeatedly as data are being accumulated, alpha spending needs to be considered. The below table classifies the aforementioned signal detection methods by their null hypothesis as well as whether they control for the family-wise error rate (FWER)
+
+
+| Null hypothesis        | non-FWER version | FWER version |
+|:--------|---------:|----------:|
+| Ratio of pain AEs to all AEs in target and comparator groups has a ratio of 1 |      PRR |  binary, group sequential  maxSPRT|
+|Independence of pain AEs and target group (based on marginal counts)|       IC |        IC with $\alpha$-spending scheme|
+
+
+We will demonstrate how the group sequential binary maxSPRT, as described in previous work, is equivalent to a FWER-controlled PRR method of signal detection.
+
+
+
+## Proportional reporting ratio (PRR) 
+
+
+The PRR estimate is calculated  
 
 $$
-\hat{\text{ROR}} = \frac{\frac{a_t}{a_t + b_t}}{\frac{c_t}{c_t+d_t}}
+\hat{\text{PRR}} = \frac{\frac{a_t}{a_t + b_t}}{\frac{c_t}{c_t+d_t}}
 $$
+with approximate $100(1-\alpha/2)$\% confidence intervals
+
+
+$$
+\left( 
+\hat{\text{PRR}} 
+{\times}
+e^{- Z_{\alpha/2}^{*}  \sqrt{\frac{1}{a_t} + \frac{1}{a_t + b_t} + \frac{1}{c_t} + \frac{1}{c_t+d_t}}}
+, \; \;
+\hat{\text{PRR}}
+{\times}
+e^{+ Z_{\alpha/2}^{*}  \sqrt{\frac{1}{a_t} + \frac{1}{a_t + b_t} + \frac{1}{c_t} + \frac{1}{c_t+d_t}}}
+\right)
+$$
+where $Z_{\alpha/2}^{*}$ is the $(1-\alpha/2)^{\text{th}}$ quantile of the standard normal distribution.
 
 
 
@@ -122,9 +150,47 @@ BCPNN IC using the *maximum a posteriori* (m.a.p.) central estimate of the IC wi
 
 ## maxSPRT
 
+[Kulldorff et al. (2011)](https://doi.org/10.1080/07474946.2011.539924) outlined that the relative risk (RR) at a given point-in-time for accumulated binary data (that is, "success"/"failure" events or AE of interest or not) of a target group relative to a comparator has the maximum likelihood estimate of 
 
-The maximised log-likelihood ratio statistic
+$$
+\hat{\text{RR}} = z \frac{C_n}{n - C_n}
+$$
 
+where 
+
+* $z$ is the ratio of the total AEs for the comparator to the total AEs for the target,
+* $C_n$ is the count of target exposure AEs in $X$,
+* $n$ is the count of all AEs in $X$ (target and comparator exposure), and
+* $n - C_n$ is therefore the count of comparator exposure AEs in $X$.
+
+In the context of our data, the values $z$, $C_n$ and $n$ are the quantilties $\frac{c_t + d_t}{a_t + b_t}$, $a_t$ and $a_t + c_t$, respectively, at time $t$.
+
+Therefore the RR maximum likelihood estimate at time $t$ can be re-written
+$$
+\begin{aligned}
+\hat{\text{RR}}_t 
+&= 
+\frac{c_t + d_t}{a_t + b_t} \times \frac{a_t}{c_t}
+\\
+&= 
+\frac{\frac{1}{a_t + b_t}}{\frac{1}{c_t + d_t}} \times \frac{a_t}{c_t}
+\\
+&= 
+\frac{\frac{a_t}{a_t + b_t}}{\frac{c_t}{c_t + d_t}} 
+\\
+\end{aligned}
+$$
+which is the PRR estimate as before.
+
+The (maximised) log-likelihood ratio statistic of $\hat{\text{RR}}_t$ can be determined calculated as
+
+$$
+\text{LLR}_t = 
+a_t  \ln \left(\frac{a_t}{a_t + c_t}\right) + 
+c_t  \ln \left(\frac{c_t}{a_t + c_t} \right) - 
+a_t  \ln\left(\frac{a_t + b_t}{a_t + b_t +c_t + d_t}\right) - 
+c_t \ln\left(\frac{c_t + d_t}{a_t + b_t + c_t + d_t}\right)
+$$
 
 
 
