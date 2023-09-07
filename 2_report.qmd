@@ -1,7 +1,7 @@
 ---
 title: "Report"
 subtitle: "Signal detection of spontaneous medical device reports over time accounting for multiple comparisons"
-author: "Ty Stanford et al."
+author: "Ty Stanford, Lan Kelly et al."
 format: 
   pdf:
     toc: true
@@ -68,15 +68,15 @@ And example record and processing values:
 
 Signal detection of disproportionate adverse events (AEs) will often have tabulated count data accumulated over time. The data at time point $t$ can be summarised as below:
 
-|         | AE(s) $X$| AE(s) $\bar{X}$ |
+|         | AE(s) $\in Y$| AE(s) $\in \bar{Y}$ |
 |:--------|---------:|----------:|
 |Target exposure|       $a_t$|        $b_t$|
 |Comparator exposure|       $c_t$|        $d_t$|
 
 where
 
-* AE(s) $X$ is the set of AEs (or singular AE) of interest, 
-* AE(s) $\bar{X}$ is the complementary set to the AEs of interest, 
+* AE(s) $Y$ is the set of AEs (or singular AE) of interest, 
+* AE(s) $\bar{Y}$ is the complementary set to the AEs of interest, 
 * *Target exposure* is the medical device(s) of interest,  
 * *Comparator exposure* is the medical devices to which the *Target exposure* is being compared, and 
 * $a_t$, $b_t$, $c_t$ and $d_t$ (all $\in \mathbb{Z}^{+}$) are the respective counts of AEs recorded up until (i.e., cumulative) time $t$.
@@ -84,7 +84,7 @@ where
 In the motivating example of the pelvic mesh device, the contingency table can be written more specifically as
 
 
-|         | AEs pain| AEs not pain |
+|         | Pain AEs | Not pain AEs  |
 |:--------|---------:|----------:|
 |Pelvic mesh|       $a_t$|        $b_t$|
 |Comparator exposure|       $c_t$|        $d_t$|
@@ -123,29 +123,37 @@ We will demonstrate how the group sequential binary maxSPRT, as described in pre
 The PRR estimate is calculated  
 
 $$
-\hat{\text{PRR}} = \frac{\frac{a_t}{a_t + b_t}}{\frac{c_t}{c_t+d_t}}
+\widehat{\text{PRR}}_t = \frac{\frac{a_t}{a_t + b_t}}{\frac{c_t}{c_t+d_t}}.
 $$
-with approximate $100(1-\alpha/2)$\% confidence intervals
-
+In the context of signal detection, an elevated proportional reporting ratio is of concern. Therefore the one-sided hypothesis test $H_0: \text{PRR} \leq 1$ (proportional reporting of the target is less than the comparator) is used and is not rejected until
 
 $$
-\left( 
-\hat{\text{PRR}} 
+\widehat{\text{PRR}}_t 
 {\times}
-e^{- Z_{\alpha/2}^{*}  \sqrt{\frac{1}{a_t} + \frac{1}{a_t + b_t} + \frac{1}{c_t} + \frac{1}{c_t+d_t}}}
-, \; \;
-\hat{\text{PRR}}
-{\times}
-e^{+ Z_{\alpha/2}^{*}  \sqrt{\frac{1}{a_t} + \frac{1}{a_t + b_t} + \frac{1}{c_t} + \frac{1}{c_t+d_t}}}
-\right)
+\exp \left\{{- Z_{\alpha}^{*}  \sqrt{\frac{1}{a_t} + \frac{1}{a_t + b_t} + \frac{1}{c_t} + \frac{1}{c_t+d_t}}}\right\} > 1
 $$
-where $Z_{\alpha/2}^{*}$ is the $(1-\alpha/2)^{\text{th}}$ quantile of the standard normal distribution.
+
+at the $\alpha$ level where $Z_{\alpha}^{*}$ is the $(1-\alpha)^{\text{th}}$ quantile of the standard normal distribution. The above threshold is equivalent to the lower bound of the approximate $100(1-2\alpha)$\% confidence interval for a standard two-sided hypothesis test.
 
 
 
-## BCPNN IC
 
-BCPNN IC using the *maximum a posteriori* (m.a.p.) central estimate of the IC with MCMC simulation of the exact empirical distribution for $100(1-\alpha/2)$\% confidence (credible) regions of [Noren (2006)](https://doi.org/10.1002/sim.2473)
+
+##  Bayesian Confidence Propagation Neural Network (BCPNN) Information Component (IC)
+
+The Information Component (IC) statistic is an estimate of the observed-to-expected ratio of the number of target exposure AEs of interest on the log${}_2$-scale under independence between the target exposure and AEs of interest based on information theory [(Bate et al., 1998)](https://doi.org/10.1007/s002280050466)
+$$
+\text{IC}_{XY} = \log_2 \frac{P_{X, Y}(a_t + b_t,a_t + c_t)}{P_X(a_t + b_t) P_Y(a_t + c_t)}
+$$
+where $P_X(X=x)$ denotes the marginal probability of an observed count $x$ for the target exposure, $P_Y(Y=y)$ denotes the marginal probability of an observed count $y$ for the AE of interest, and $P_{X,Y}(X=x, Y=y)$ denotes the joint probability.
+
+The BCPNN IC of [Noren et al. (2006)](https://doi.org/10.1002/sim.2473) uses a Bayesian inference based *maximum a posteriori* (m.a.p.) central estimate of the IC,  
+$$
+\widehat{\text{IC}}_t = \log_2 \frac{\text{E}\left[ \hat{p}_a \right]}{\text{E}\left[ \hat{p}_a + \hat{p}_b\right]\text{E}\left[ \hat{p}_a + \hat{p}_c\right]}
+$$
+
+where $p_a$, $p_b$ and $p_c$ are the (assumed constant over time) underlying probabilities of the multinomial-distributed observed events $a_t$, $b_t$ and $c_t$, respectively ($p_d$ corresponding to the count $d_t$ also included). The underlying probabilities are modelled using Dirichlet priors resulting in a Dirichlet posterior distribution. The one-sided null hypothesis of the joint probability target exposure and AEs of interest is equal or less than the marginal products ($H_0: \text{IC}_t \leq 0$) can be rejected when the $\alpha$ quantile of the Markov Chain Monte Carlo (MCMC) empirical distribution is greater than 0. Similarly to the rejection rule for the PRR, this threshold corresponds to the lower bound of the $100(1-2\alpha)$\% equal-tailed credible region in a two-sided hypothesis test.
+
 
 
 ## maxSPRT
@@ -153,7 +161,7 @@ BCPNN IC using the *maximum a posteriori* (m.a.p.) central estimate of the IC wi
 [Kulldorff et al. (2011)](https://doi.org/10.1080/07474946.2011.539924) outlined that the relative risk (RR) at a given point-in-time for accumulated binary data (that is, "success"/"failure" events or AE of interest or not) of a target group relative to a comparator has the maximum likelihood estimate of 
 
 $$
-\hat{\text{RR}} = z \frac{C_n}{n - C_n}
+\widehat{\text{RR}} = z \frac{C_n}{n - C_n}
 $$
 
 where 
@@ -163,12 +171,12 @@ where
 * $n$ is the count of all AEs in $X$ (target and comparator exposure), and
 * $n - C_n$ is therefore the count of comparator exposure AEs in $X$.
 
-In the context of our data, the values $z$, $C_n$ and $n$ are the quantilties $\frac{c_t + d_t}{a_t + b_t}$, $a_t$ and $a_t + c_t$, respectively, at time $t$.
+In the context of our data, the values $z$, $C_n$ and $n$ are the quantities $\frac{c_t + d_t}{a_t + b_t}$, $a_t$ and $a_t + c_t$, respectively, at time $t$.
 
 Therefore the RR maximum likelihood estimate at time $t$ can be re-written
 $$
 \begin{aligned}
-\hat{\text{RR}}_t 
+\widehat{\text{RR}}_t 
 &= 
 \frac{c_t + d_t}{a_t + b_t} \times \frac{a_t}{c_t}
 \\
@@ -180,9 +188,9 @@ $$
 \\
 \end{aligned}
 $$
-which is the PRR estimate as before.
+which is the PRR estimate at time $t$ as before.
 
-The (maximised) log-likelihood ratio statistic of $\hat{\text{RR}}_t$ can be determined calculated as
+The (maximised) log-likelihood ratio statistic of $\widehat{\text{PRR}}_t$ (equivalently, $\widehat{\text{RR}}_t$) can be determined calculated as
 
 $$
 \text{LLR}_t = 
