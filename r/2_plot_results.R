@@ -52,8 +52,24 @@ sra <-
 thresholds <- sort(unique(sra[["thresh"]]))
 length(thresholds)
 
+# ---- example_data ----
 
-# ---- time_to_sig_plot ----
+cols_want <- c(
+  "Quarter" = "mnth",
+  "$t$" = "t",
+  "$a_t$" = "nA",
+  "$b_t$" = "nB",
+  "$c_t$" = "nC",
+  "$d_t$" = "nD"
+)
+
+sra_cum_bcpnn %>%
+  dplyr::filter(substr(grps, 1, 3) == "(a)", thresh == "0.050") %>%
+  mutate(t = 1:n()) %>%
+  select(all_of(cols_want)) %>%
+  kable(.)
+
+# ---- time_to_sig_plot1 ----
 
 
 
@@ -81,7 +97,9 @@ signif_plt <-
     grps = fct_inorder(grps)
   ) 
 
-levels(signif_plt$grps)
+
+
+# levels(signif_plt$grps)
 
 signif_plt %>%
   arrange(grps, thresh) %>%
@@ -104,6 +122,11 @@ ggsave(
   filename = "fig/time_to_signal_method_facets.png", 
   dpi = 900, width = 9, height = 9
 )
+
+
+
+# ---- time_to_sig_plot2 ----
+
 
 signif_plt %>%
   arrange(grps, thresh) %>%
@@ -130,7 +153,7 @@ ggsave(
 
 
 
-# ---- stat_over_time_plot ----
+# ---- stat_over_time_plot1 ----
 
 
 
@@ -149,7 +172,7 @@ sra_stat_plt <-
   ) 
 
 thresholds <- sort(unique(sra_stat_plt[["thresh"]]))
-length(thresholds)
+# length(thresholds)
 thresh_scale <- rev(hcl.colors(length(thresholds), "SunsetDark"))
 # thresh_scale <- rev(hcl.colors(length(thresholds) + 1, "Inferno"))[-1] 
 
@@ -197,6 +220,10 @@ ggsave(
   filename = "fig/pelvic_v_hernia_sig_detect_over_time.png", 
   dpi = 900, width = 10, height = 8
 )
+
+
+# ---- stat_over_time_plot2 ----
+
 
 thresh_lablr <- function(string) paste0("P(topic = 'pain' | doc)\nthreshold: ", string)
 

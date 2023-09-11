@@ -1,7 +1,7 @@
 ---
 title: "Report"
 subtitle: "Signal detection of spontaneous medical device reports over time accounting for multiple comparisons"
-author: "Ty Stanford, Lan Kelly et al."
+author: "Lan Kelly, Ty Stanford, et al."
 format: 
   pdf:
     toc: true
@@ -22,26 +22,44 @@ knitr::read_chunk('r/2_plot_results.R')
 
 \newpage
 
-# Set up
 
-## Packages
-
-
-```{R, libs}
-```
-
-## Load data
-
-
-```{R, load_dat}
-```
+# Abstract
 
 
 
 
 \newpage
 
+# Introduction
+
+Adverse events from implantable medical devices are commonly reported to regulatory bodies in the form of unstructured free text in spontaneous reports. 
+Detecting safety signals from the reports for post-market surveillance can be challenging. 
+Spontaneous reports of adverse events may be submitted by manufacturers, clinicians and consumers to the Database of Adverse Event Notifications (DAEN), maintained by the Australian Therapeutic Goods Administration (TGA) in the form of unstructured free text. 
+Pelvic (urogynaecological) mesh was used to treat women for pelvic organ prolapse and stress urinary incontinence. 
+While the device provided benefits to some women, others experienced serious complications. 
+
+
+The aim of this study was to classify the DAEN reports into related adverse events and detect potential safety signals from use of pelvic mesh.
+
+
+
+\newpage
+
 # Methods
+
+
+
+
+The DAEN was searched for reports on pelvic and hernia mesh from 2012-2017. 
+Topic modelling, a Natural Language Processing technique, was used to profile the unstructured text into mixtures of clinically relevant topics. 
+A report was considered to contain a particular topic $X$ if the probability it contains words relating to the topic, P(topic = $X$| document), was over a certain threshold, which was varied in the analysis.
+
+Disproportionality analysis was used to detect potential signals from the most frequent clinical topic from pelvic mesh, with hernia mesh and other devices used as comparators. Measures are based on a $2 {\times} 2$ contingency table for the number of adverse events with and without the most frequent topic in the device of interest and the comparator. Testing was performed on the DAEN at quarterly intervals, if new data were accumulated in the interval, over the study period, commencing in 2012. 
+
+
+
+
+
 
 ## Data aquisition
 
@@ -95,7 +113,7 @@ where
 * *AEs pain* is the count of AEs that contain "pain" themes greater or equal to some pre-specified threshold $p_t \in (0,1)$ as estimated by the hSBM (that is, $P(\texttt{topic == "pain"} | \texttt{Level, Doc}) \geq p_t$), and
 * *Comparator exposure* can be any relevant set of medical devices to compare the pelvic mesh to (e.g., hernia mesh or all other mesh devices or all other devices).
 
-# The signal detection statistics over time
+## Signal detection over time
 
 We will consider the three signal detection statistics below:
 
@@ -117,7 +135,16 @@ We will demonstrate how the group sequential binary maxSPRT, as described in pre
 
 
 
-## Proportional reporting ratio (PRR) 
+Methods used included the Bayesian Confidence Propagation Neural Network (BCPNN) and the maximised Sequential Probability Ratio Test (maxSPRT) which accounted for multiple testing through alpha spending. The BCPNN was used with and without adjusting for multiple testing. The test statistic for BCPNN is the information criterion (IC) which represents the log2 of the ratio of observed to expected adverse events (0 under the null hypothesis of no association between the topic and pelvic mesh).
+
+maxSPRT was developed for near continuous sequential monitoring (called “group sequential” when monitored at discrete time points or after set accumulatios of events), maintaining the correct overall alpha level. The test statistic is based on the maximized (log-)likelihood ratio statistic which uses the observed and expected (under the null hypothesis) reporting ratio assuming binomial adverse event accumulation. The critical value of the likelihood ratio statistic is determined by the 100(1-α)% quantile of possible likelihood ratio statistics from binomial adverse event counts under the null hypothesis over the entire group sequential follow-up.
+
+
+
+
+
+
+### Proportional reporting ratio (PRR) 
 
 
 The PRR estimate is calculated  
@@ -139,7 +166,7 @@ at the $\alpha$ level where $Z_{\alpha}^{*}$ is the $(1-\alpha)^{\text{th}}$ qua
 
 
 
-##  Bayesian Confidence Propagation Neural Network (BCPNN) Information Component (IC)
+###  Bayesian Confidence Propagation Neural Network (BCPNN) Information Component (IC)
 
 The Information Component (IC) statistic is an estimate of the observed-to-expected ratio of the number of target exposure AEs of interest on the log${}_2$-scale under independence between the target exposure and AEs of interest based on information theory [(Bate et al., 1998)](https://doi.org/10.1007/s002280050466)
 $$
@@ -156,7 +183,7 @@ where $p_a$, $p_b$ and $p_c$ are the (assumed constant over time) underlying pro
 
 
 
-## maxSPRT
+### maxSPRT
 
 [Kulldorff et al. (2011)](https://doi.org/10.1080/07474946.2011.539924) outlined that the relative risk (RR) at a given point-in-time for accumulated binary data (that is, "success"/"failure" events or AE of interest or not) of a target group relative to a comparator has the maximum likelihood estimate of 
 
@@ -205,9 +232,9 @@ $$
 \newpage
 
 
-# Analysis choices:
+## Analysis choices
 
-* Data structures - cumulative vs snapshot
+
 * Threshold choose
 * How many "looks"
 * how to choose alpha spending
@@ -218,23 +245,81 @@ $$
 \newpage
 
 
-# Plots
+# Results
+
+Pelvic mesh had the highest proportion of reports including the word "pain", followed by other and hernia mesh (Figure 1).
 
 
 
-```{R, time_to_sig_plot}
-#| fig.width: 7
-#| fig.height: 7
+![Frequency of pain topic in pelvic, hernia and other mesh and other devices.](fig/pain_topic_dist.png){}
+
+
+
+```{R, libs}
+#| include: false
 ```
 
 
 
-```{R, stat_over_time_plot}
-#| fig.width: 7
-#| fig.height: 7
+```{R, load_dat}
+#| include: false
+```
+
+The cumulative number of pain topics in pelvic mesh $a_t$ increased sharply in Q4 2014 compared with the previous quarter. The table shows the cumulative $2 {\times} 2$ table each quarter up to $t=$ 2015-Q1 with hernia mesh as the comparator (and pain topic threshold of 0.05).
+
+
+```{R, example_data}
+#| echo: false
+#| results: 'asis'
+#| tbl-cap: "Cumulative quarterly AE counts of pelvic mesh ($a_t$ is pain topic count) compared to hernia mesh ($c_t$ is pain topic count) using a pain topic threshold of 0.05."
 ```
 
 
+
+
+
+Words associated with "pain" comprised the most frequent clinical topic for pelvic mesh
+Optimal threshold for P(topic = "pain"| document) pain topics in pelvic mesh for earliest detection from maxSPRT and multiple adjusted BCPNN, depending on comparator (Figure 2): 
+
+* Hernia mesh  < 0.09
+* Other mesh    0.06 – 0.08
+* All other devices: Unstable for thresholds > 0.06
+
+
+Combining results, the best threshold is 0.06 
+Earliest time period  when signal was detected with and without adjustment for multiple testing and maxSPRT by year, with hernia mesh as a comparator:
+
+
+|         | |  
+|:--------|---------:|
+|BCPNN|       August 2014|      
+|BCPNN with adjustment for multiple testing | December 2014	|
+|maxSPRT | December 2014 |
+  
+
+
+
+```{R, stat_over_time_plot1}
+#| echo: false
+#| fig.width: 7
+#| fig.height: 7
+#| fig-cap: "Test statistic values over time."
+```
+
+
+
+```{R, time_to_sig_plot1}
+#| echo: false
+#| fig.width: 7
+#| fig.height: 7
+#| fig-cap: "Time when methods reached critical values for signal detection."
+```
+
+\newpage
+
+# Conclusion 
+
+Urogynaecological mesh was withdrawn from the Australian market in 2018, while our retrospective analysis with a 0.06 threshold detected signals between August – December 2014. We have demonstrated the potential of using topic modelling in spontaneous reports for signal detection in post-market surveillance.
 
 
 
@@ -244,8 +329,6 @@ $$
 
 
 ```{R}
-# Sys.info()[!(names(Sys.info()) %in% c("login", "nodename"))] %>% 
-#   as.data.frame(.)
 format(Sys.time(), '%d %b %Y')
 sessionInfo()
 ```
