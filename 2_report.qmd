@@ -71,7 +71,15 @@ The data is thanks to [curtis-murray](https://github.com/curtis-murray) at his [
 
 And example record and processing values:
 
-* [to include here]
+| Report_ID|Report date |Class        |Device    | P('pain'&#124;doc)| ARTG no.|Event     |Source              |Event type |Description                                                                                                                                            |
+|---------:|:-----------|:------------|:---------|------------------:|--------:|:---------|:-------------------|:----------|:------------------------------------------------------------------------------------------------------------------------------------------------------|
+|     37537|2015-02-06  |other_device |Class IIa |              0.029|   137859|Injury    |Industry            |Mechanical |Patient admitted for routine SFA angioplasty. The physician had completed the procedure without incident and had withdrawn the balloon catheter fro... |
+|     36797|2015-08-27  |other_mesh   |Class III |              0.020|   219240|Injury    |Industry            |Material   |3 weeks post-op, patient contacted the surgeon saying that the wound was opening, and she could see the implant. The patient sent photos, and there... |
+|     40917|2016-04-24  |pelvic_mesh  |Class IIb |              0.538|    92718|Injury    |Consumer            |Other      |Have had pelvic pain, pain with sex incontinence with bowel and bladder, cannot sit, walk, stand on feet for extended time.                            |
+|     45432|2017-03-29  |hernia_mesh  |Class IIb |              0.214|    98833|Injury    |Consumer            |Other      |Atrium mesh implanted in my abdomen. Severe right sided abdominal pain ongoing. Also had further surgery to repair hernia due to reoccurrence of he... |
+|     44402|2017-12-01  |other_device |Class III |              0.000|   149128|No Injury |Other               |Other      |Sponsor distributed a Customer Letter dated 20th December 2016 announcing the immediate discontinuation of their CE-marked Umbilical Vessel Cathete... |
+|     45624|2017-12-04  |other_device |Class 1   |              0.000|   121950|No Injury |Health Professional |Mechanical |Operating table started tilting patient on its own during procedure. Emergency stop button pressed - table stopped briefly and began to tilt patien... |
+|     45265|2017-12-18  |other_device |Class IIb |              0.250|   177101|Injury    |Industry            |Other      |Pain, possible rupture and swelling around prosthesis.                                                                                                 |
 
 
 
