@@ -3,6 +3,10 @@ title: "Report"
 subtitle: "Signal detection of spontaneous medical device reports over time accounting for multiple comparisons"
 author: "Lan Kelly, Ty Stanford, et al."
 format: 
+  docx:
+    toc: true
+    highlight-style: atom-one
+    number-sections: true
   pdf:
     toc: true
     highlight-style: atom-one
@@ -22,25 +26,69 @@ knitr::read_chunk('r/2_plot_results.R')
 
 \newpage
 
+[https://academic.oup.com/jamia/pages/General_Instructions](https://academic.oup.com/jamia/pages/General_Instructions)
+
+**Research and Applications**
+
+Research and Applications articles describe original work in the formulation, implementation, or evaluation of informatics-based studies and investigations. The articles do not need to be limited to hypothesis-driven research, and they can, for example, report on an innovative application of information technology, the detailed description of a new methodology, or the formulation and formative evaluation of a new model. The structured abstract should contain the headings: Objective, Materials and Methods, Results, Discussion, and Conclusion. The main text should, in addition to the sections corresponding to these headings, include a section describing Background and Significance.
+
+(Word count: up to 4000 words.
+Structured abstract: up to 250 words.
+Tables: up to 4.
+Figures: up to 6.
+References: unlimited.)
+
+
+**Brief Communications**
+
+Brief Communications are short versions of Research and Applications articles, often describing focused approaches to solve a particular problem, or preliminary evaluation of a novel system or methodology.
+
+Word count: up to 2000 words.
+Structured abstract: up to 150 words.
+Tables: up to 2.
+Figures: up to 3.
+References: unlimited.
+
+
 
 # Abstract
 
+Objective
 
+Materials and Methods
+
+Results
+
+Discussion 
+
+Conclusion
 
 
 \newpage
 
 # Introduction
 
-Adverse events from implantable medical devices are commonly reported to regulatory bodies in the form of unstructured free text in spontaneous reports. 
+Adverse events from implantable medical devices are commonly reported to regulatory bodies in the form of unstructured free-text in spontaneous reports. 
 Detecting safety signals from the reports for post-market surveillance can be challenging. 
 Spontaneous reports of adverse events may be submitted by manufacturers, clinicians and consumers to the Database of Adverse Event Notifications (DAEN), maintained by the Australian Therapeutic Goods Administration (TGA) in the form of unstructured free text. 
 Pelvic (urogynaecological) mesh was used to treat women for pelvic organ prolapse and stress urinary incontinence. 
 While the device provided benefits to some women, others experienced serious complications. 
 
+The pelvic mesh was removed from market in ...
 
-The aim of this study was to classify the DAEN reports into related adverse events and detect potential safety signals from use of pelvic mesh.
+There is still ongoing heath, financial and legal fallout from the device's use [Dec 22](https://www.abc.net.au/news/2022-12-04/mesh-implant-class-action-shine-lawyers-payout-dispute/101728850) 
 
+
+[talk about standard signal detection in structure databases]
+
+[has there been any NLP of free-text in adverse events/safety monitoring?]
+
+The aim of this study was to develop an in-principle, end-to-end pipeline to complement traditional signal detection of disproportionately higher reporting rates of adverse events, using a historical true-positive pelvic mesh, to utilise information currently not used to screen for medical device safety issues to:
+
+1. classify the DAEN reports into topics, based on the free-text descriptions of the adverse events, using natural language processing (NLP) 
+2. implement best-in-class, repeated looks over time signal detection algorithms on NLP process data 
+3. report time to signal findings for the true-positive pelvic mesh safety for generalisation and feasibility
+3. compare the screening detection timings to more widespread concerns
 
 
 \newpage
@@ -69,10 +117,10 @@ The data is thanks to [curtis-murray](https://github.com/curtis-murray) at his [
 * Each record has an estimate of P(`topic == "pain"` | `Level`, `Doc`) using hierarchical stochastic block modelling (hSBM)
 * P(`topic == "pain"` | `Level`, `Doc`) estimates for each record are roughly interpreted as the proportion of the NLP analysed free text that is considered as using/describing words related to pain
 
-And example record and processing values:
+And example record and processing values (description limited to 150 characters):
 
-| Report_ID|Report date |Class        |Device    | P('pain'&#124;doc)| ARTG no.|Event     |Source              |Event type |Description                                                                                                                                            |
-|---------:|:-----------|:------------|:---------|------------------:|--------:|:---------|:-------------------|:----------|:------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ReportID|Report date |Class        |Device    | P('pain'&#124;doc)| ARTG no.|Event     |Source              |Event type |Description   |
+|---:|:---|:---|:---|----:|----:|:---|:---|:---|:------|
 |     37537|2015-02-06  |other_device |Class IIa |              0.029|   137859|Injury    |Industry            |Mechanical |Patient admitted for routine SFA angioplasty. The physician had completed the procedure without incident and had withdrawn the balloon catheter fro... |
 |     36797|2015-08-27  |other_mesh   |Class III |              0.020|   219240|Injury    |Industry            |Material   |3 weeks post-op, patient contacted the surgeon saying that the wound was opening, and she could see the implant. The patient sent photos, and there... |
 |     40917|2016-04-24  |pelvic_mesh  |Class IIb |              0.538|    92718|Injury    |Consumer            |Other      |Have had pelvic pain, pain with sex incontinence with bowel and bladder, cannot sit, walk, stand on feet for extended time.                            |
@@ -235,6 +283,7 @@ a_t  \ln\left(\frac{a_t + b_t}{a_t + b_t +c_t + d_t}\right) -
 c_t \ln\left(\frac{c_t + d_t}{a_t + b_t + c_t + d_t}\right)
 $$
 
+The maxSPRT test is considered significant when $LLR_t$ is greater than the pre-computed critical value which is the $100(1-\alpha)$\% percentile of the  $LLR_t$ values generated under the null hypothesis $\text{RR}_t = 1$ for group sequential looks at the data $t = t_1, t_2, \ldots, t_k$. The CV can either be computed exactly or by MCMC to approximate the $LLR$ distribution when 
 
 
 \newpage
