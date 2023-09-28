@@ -83,13 +83,17 @@ There is still ongoing heath, financial and legal fallout from the device's use 
 
 [has there been any NLP of free-text in adverse events/safety monitoring?]
 
-The aim of this study was to develop an in-principle, end-to-end pipeline to complement traditional signal detection of disproportionately higher reporting rates of adverse events, using a historical true-positive pelvic mesh, to utilise information currently not used to screen for medical device safety issues to:
+The aim of this study was to develop an end-to-end pipeline, utilising free-text information currently not used to screen for medical device safety issues, using an Australian database of medical device adverse events (Database of Adverse Event Notifications, DAEN) to:
 
-1. classify the DAEN reports into topics, based on the free-text descriptions of the adverse events, using natural language processing (NLP) 
-2. implement best-in-class, repeated looks over time signal detection algorithms on NLP process data 
-3. report time to signal findings for the true-positive pelvic mesh safety for generalisation and feasibility
-3. compare the screening detection timings to more widespread concerns
+1. implement over time, repeated look adjusted disproportional reporting rate ("signal detection") algorithms on medical device adverse event data,
+1. evaluate the feasibility of disproportional reporting rate methods to detect signal in free-text descriptions of adverse events using natural language processing (NLP) to classify DAEN reports into topics,
+3. report retrospective time-to-signal findings for the recalled pelvic mesh device associated with pain adverse events for analysis pipeline feasibility, 
+2. evaluate the sensitivity of signal detection methods to assumed data accumulation length and rates (e.g., the critical value calculation for maxSPRT), and
+3. compare the retrospective time-to-signal timings to more widespread concerns about pain adverse events and the recalled pelvic mesh device.
 
+
+
+complement traditional signal detection of disproportionately higher reporting rates of adverse events for medical devices
 
 \newpage
 
