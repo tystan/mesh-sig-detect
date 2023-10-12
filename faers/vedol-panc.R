@@ -5,12 +5,14 @@ library("arrow") # reading in parquet data
 library("dplyr") # piping and manipulation of data
 library("tibble") # prettier data.frames
 library("ggplot2") # plotting
+library("ggthemes") # plotting
 library("knitr") # to print kable(.) tables
 library("tidyr") # pivot_wider() function
 library("readr") # 
 library("lubridate") #
 library("purrr")
 library("foreach")
+library("gsDesign")
 
 
 # NOTE: need to run first (only once, assumes devtools installed):
@@ -316,7 +318,29 @@ maxsprt_dat %>%
   kable(.)
 
 
-get_sig_tab <- function(nA, nB, nC, nD, alpha = 0.05, n_mcmc = 1e+05) {
+
+# if it's multiple comparisons central need to sparing use alpha
+get_mult_compare_adj_alpha <- function(dat, alpha = 0.1) {
+  
+  n_reports <- nrow(dat)
+  
+  information_fracs <-  1:n_reports / n_reports
+  
+  ### alternatives:
+  # spend_obj <- sfLDPocock(alpha = 0.025, t = information_fracs, param = NULL)
+  # spend_obj <- sfLDOF(alpha = 0.025, t = information_fracs, param = NULL)
+  spend_obj <- sfExponential(alpha = alpha, t = information_fracs, param = 0.5)
+  
+  # plot(1:n_reports, spend_obj$spend, main = "alpha spending func", xlab = "look")
+  
+  return(bind_cols(dat, adj_alpha = spend_obj$spend))
+  
+}
+# test
+get_mult_compare_adj_alpha(maxsprt_dat)
+
+
+get_sig_tab <- function(nA, nB, nC, nD, alpha = 0.1, n_mcmc = 1e+05) {
   
   out_cols_of_interest <- c("est_name", "est_scale", "est", "alpha", "ci_lo", "ci_hi")
   sig_tab <- pharmsignal::bcpnn_mcmc_signal(nA, nB, nC, nD, alpha = alpha, n_mcmc = n_mcmc)
@@ -328,9 +352,10 @@ get_sig_tab <- function(nA, nB, nC, nD, alpha = 0.05, n_mcmc = 1e+05) {
 get_sig_tab(30,  5512, 41, 17445)
 
 
-get_sig_tab_over_time <- function(dat, alpha = 0.05, n_mcmc = 1e+05) {
+get_sig_tab_over_time <- function(dat, alpha = 0.1, n_mcmc = 1e+05) {
   
   n_tp <- nrow(dat)
+  dat <- get_mult_compare_adj_alpha(dat)
   
   sig_tab_over_time <-
     foreach(i = 1:n_tp, .combine = bind_rows, .packages = "dplyr") %do% {
@@ -339,7 +364,7 @@ get_sig_tab_over_time <- function(dat, alpha = 0.05, n_mcmc = 1e+05) {
         get_sig_tab(
           # mnth[i], 
           a[i], b[i], c[i], d[i], 
-          alpha = alpha, n_mcmc = n_mcmc
+          alpha = adj_alpha[i], n_mcmc = n_mcmc
         )
       )
     }
@@ -356,3 +381,44 @@ bcpnn_data <-
 
 bcpnn_data %>%
   kable(.)
+
+plt_dat <-
+  bind_rows(
+    maxsprt_dat %>% 
+      select(comparator, dte, cv, reached_cv, val = maxllr) %>%
+      mutate(stat = "MaxSPRT (max LLR)"),
+    bcpnn_data %>% 
+      select(comparator, dte, val = ci_lo) %>%
+      mutate(cv = 0, reached_cv = as.integer(val > cv), stat = "IC (BCPNN, Lower 95% CI )")
+  ) 
+
+plt_dat <-
+  plt_dat %>%
+  arrange(stat, comparator, dte) %>%
+  group_by(stat, comparator) %>%
+  dplyr::filter(reached_cv == 1) %>%
+  dplyr::filter(row_number() == 1) %>%
+  select(stat, comparator, dte_reached = dte) %>%
+  left_join(
+    plt_dat,
+    .,
+    c("stat", "comparator")
+  )
+
+plt_dat %>%
+  ggplot(., aes(x = dte, y = val, col = comparator )) +
+  geom_hline(aes(yintercept = cv)) +
+  geom_line(alpha = 0.5) +
+  geom_point() +
+  geom_vline(aes(xintercept = dte_reached, col = comparator), alpha = 0.5) +
+  facet_wrap(~ stat, ncol = 1, scales = "free_y") +
+  scale_colour_tableau() +
+  theme_bw() +
+  labs(
+    x = "Quarter",
+    y = "Statistic",
+    col = "Comparison"
+  )
+
+
+
