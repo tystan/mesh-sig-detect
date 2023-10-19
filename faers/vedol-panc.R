@@ -429,6 +429,14 @@ bcpnn_data <-
     get_sig_tab_over_time(bcpnn_data)
   )
 
+# truncate exceedingly negative values for plotting 
+bcpnn_data <-
+  bcpnn_data %>%
+  mutate(
+    ci_lo = if_else(ci_lo < -5, -5, ci_lo)
+  )
+
+
 bcpnn_data %>%
   kable(.)
 
@@ -448,25 +456,35 @@ plt_dat <-
       mutate(cv = 0, reached_cv = as.integer(val > cv), stat = "IC (BCPNN, Lower 95% CI )")
   ) 
 
-plt_dat <-
+
+sig_reach_dat <-
   plt_dat %>%
   arrange(stat, comparator, dte) %>%
   group_by(stat, comparator) %>%
   dplyr::filter(reached_cv == 1) %>%
   dplyr::filter(row_number() == 1) %>%
   select(stat, comparator, dte_reached = dte) %>%
+  # now create separation between reached CV values when it occurs
+  group_by(stat, dte_reached) %>%
+  mutate(rep_dte = 1:n()) %>%
+  ungroup() %>%
+  mutate(dte_reached = dte_reached + days(10 * (rep_dte - 1))) %>%
+  select(-rep_dte)
+  
+  
+plt_dat <-
   left_join(
     plt_dat,
-    .,
+    sig_reach_dat,
     c("stat", "comparator")
   )
 
 plt_dat %>%
   ggplot(., aes(x = dte, y = val, col = comparator )) +
-  geom_hline(aes(yintercept = cv)) +
+  geom_hline(aes(yintercept = cv), alpha = 0.5) +
+  geom_vline(aes(xintercept = dte_reached, col = comparator), alpha = 0.5) +
   geom_line(alpha = 0.5) +
   geom_point() +
-  geom_vline(aes(xintercept = dte_reached, col = comparator), alpha = 0.5) +
   facet_wrap(~ stat, ncol = 1, scales = "free_y") +
   scale_colour_tableau() +
   theme_bw() +
@@ -479,6 +497,12 @@ plt_dat %>%
 
 ggsave(
   filename = "faers/vedol_panc_signal_detection_over_time.pdf",
+  width = 10,
+  height = 8
+)
+
+ggsave(
+  filename = "faers/vedol_panc_signal_detection_over_time.png",
   width = 10,
   height = 8
 )
