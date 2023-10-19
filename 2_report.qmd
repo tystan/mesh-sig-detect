@@ -1,12 +1,12 @@
 ---
 title: "Report"
 subtitle: "Signal detection of spontaneous medical device reports over time accounting for multiple comparisons"
-author: "Lan Kelly, Ty Stanford, et al."
-format: 
+author: "Ty Stanford, Lan Kelly, et al."
+format:
   docx:
     toc: true
     highlight-style: atom-one
-    number-sections: true
+    number-sections: true 
   pdf:
     toc: true
     highlight-style: atom-one
@@ -83,17 +83,17 @@ There is still ongoing heath, financial and legal fallout from the device's use 
 
 [has there been any NLP of free-text in adverse events/safety monitoring?]
 
-The aim of this study was to develop an end-to-end pipeline, utilising free-text information currently not used to screen for medical device safety issues, using an Australian database of medical device adverse events (Database of Adverse Event Notifications, DAEN) to:
+The purpose of this study was to develop an end-to-end pipeline, utilising free-text information to screen for medical device safety issues, using an Australian spontaneous report database of medical device adverse events (Database of Adverse Event Notifications, DAEN). The study aims to evaluate the feasibility of disproportional reporting rate methods to detect signals in free-text descriptions of adverse events using natural language processing (NLP) to classify DAEN reports into topics by:
 
-1. implement over time, repeated look adjusted disproportional reporting rate ("signal detection") algorithms on medical device adverse event data,
-1. evaluate the feasibility of disproportional reporting rate methods to detect signal in free-text descriptions of adverse events using natural language processing (NLP) to classify DAEN reports into topics,
-3. report retrospective time-to-signal findings for the recalled pelvic mesh device associated with pain adverse events for analysis pipeline feasibility, 
-2. evaluate the sensitivity of signal detection methods to assumed data accumulation length and rates (e.g., the critical value calculation for maxSPRT), and
-3. compare the retrospective time-to-signal timings to more widespread concerns about pain adverse events and the recalled pelvic mesh device.
-
+1.	implementing over time, repeated look adjusted disproportional reporting rate (“signal detection”) algorithms on medical device adverse event data,
+2.	reporting retrospective time-to-signal findings for  pelvic mesh devices associated with pain adverse events for analysis pipeline feasibility,
+3.	evaluating the sensitivity of signal detection methods to assumed data accumulation length and rates (e.g., the critical value calculation for maxSPRT), and
+4.	comparing the retrospective time-to-signal to the timings of the withdrawl of pelvic mesh devices in Australia.
 
 
-complement traditional signal detection of disproportionately higher reporting rates of adverse events for medical devices
+
+
+
 
 \newpage
 
@@ -287,7 +287,7 @@ a_t  \ln\left(\frac{a_t + b_t}{a_t + b_t +c_t + d_t}\right) -
 c_t \ln\left(\frac{c_t + d_t}{a_t + b_t + c_t + d_t}\right)
 $$
 
-The maxSPRT test is considered significant when $LLR_t$ is greater than the pre-computed critical value which is the $100(1-\alpha)$\% percentile of the  $LLR_t$ values generated under the null hypothesis $\text{RR}_t = 1$ for group sequential looks at the data $t = t_1, t_2, \ldots, t_k$. The CV can either be computed exactly or by MCMC to approximate the $LLR$ distribution when 
+The maxSPRT test is considered significant when $LLR_t$ is greater than the pre-computed critical value which is the $100(1-\alpha)$\% percentile of the  $LLR_t$ values generated under the null hypothesis $\text{RR}_t = 1$ for group sequential looks at the data $t = t_1, t_2, \ldots, t_k$. The CV can either be computed using the 95th percentile of $LLR_t$ values with the exact joint binomial probabilities over $k$ looks of the data accumulation under the null hypothesis, or by MCMC sampling of binomial event accumulation (and associated $LLR_t$ values) to approximate the $LLR$ distribution when the exact CV computation is computationally intractable.\footnote{The \texttt{Sequential} R package exact CV function suggests "not using values greater than 1000" in regards to the total events to potentially be observed over the follow-up.}
 
 
 \newpage
@@ -296,11 +296,27 @@ The maxSPRT test is considered significant when $LLR_t$ is greater than the pre-
 ## Analysis choices
 
 
-* Threshold choose
-* How many "looks"
-* how to choose alpha spending
-* sample size limitations for maxsprt - not an issue now can use MCMC method of `EmpiricalCalibration`
+A large unknown what threshold should be used to dichotomise P(`topic == "pain"` |  `Doc`) into pain and non-pain spontaneous event report. 
+The threshold can roughly be interpreted as the proportion of the spontaneous event report free text relates to "pain" topics. 
+It is a balancing act, likely with some "safe zone", to choose a threshold high enough that false-positive pain reports don't occur too frequently to induce noise or bias that might exist between the two device groups being compared, and also importantly a threshold low enough that pain events are not missed with false negatives and having the flow on effect of not having enough events of interest to sufficiently power the disproportionality statistics.
+From pilot feasibility exploration, the thresholds considered were from 0.5\% to 10\% of the free text, i.e., using thresholds $e_{topic} = \left\{0.005, 0.010, ..., 0.100 \right\}$.
+Further complicating matters, it should be noted, optimal P(`topic == "pain"` | `Doc`) thresholds may be different for differing event topics, however, we only consider the pain topic in this study.
 
+We choose to perform the analysis group sequential analysis at quarterly time points as this is a reasonable accumulation of events in the Australian specific data source and represents a data accumulation interval feasible for large scale medical device safety monitoring given the computational and pipeline complexity of NLP of the free text and downstream analysis.
+
+There are a vast amount of options in choosing an alpha-spending function to use with the BCPNN IC (lower) confidence interval calculations. However, we have chosen the widely used exponential spending function (Anderson and Clark, 2009) with $\nu = \frac{1}{2}$ because of its wide use and reasonable proporties.
+
+The statistical analysis enumerates the following choices:
+
+* comparator: pelvic mesh is compared to a range of specific (hernia mesh) to less specific (all other devices) comparator groups to characterise analysis performance,
+* pain topic threshold, and
+* competing signal detection methods in alpha-spend adjusted BCPNN IC calculations and maxSPRT.
+
+\footnote{
+Anderson KM and Clark JB (2009), Fitting spending functions. Statistics in Medicine; 29:321-327.
+Jennison C and Turnbull BW (2000), Group Sequential Methods with Applications to Clinical Trials. Boca Raton: Chapman and Hall.
+Lan, KKG and DeMets, DL (1983), Discrete sequential boundaries for clinical trials. Biometrika; 70:659-663.
+}
 
 
 \newpage
