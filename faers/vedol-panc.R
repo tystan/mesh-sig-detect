@@ -100,6 +100,11 @@ anti_join(
   "primaryid"
 )
 
+
+# ---- merge ----
+
+
+
 nrow(set_mem)
 set_mem <-
   inner_join(
@@ -123,6 +128,8 @@ with(
   table(fda_yr, fda_qtr, useNA = "ifany")
 )
 
+
+# ---- create_counts ----
 
 
 # standardise the summary data once the dataset has been filtered as required
@@ -240,25 +247,34 @@ with(signal_data_wide, table(comparator))
 
 signal_data_wide <-
   signal_data_wide %>%
-  dplyr::filter(comparator == "(3) IRAs") %>%
+#  dplyr::filter(comparator == "(3) IRAs") %>%
   arrange(comparator, fdayr, fdaqtr)
 
 
 signal_data_wide <-
   signal_data_wide %>%
+  group_by(comparator) %>%
   mutate(
     a = cumsum(a),
     b = cumsum(b),
     c = cumsum(c),
     d = cumsum(d)
-  )
+  ) %>%
+  ungroup()
 
-signal_data_wide
+signal_data_wide %>%
+  dplyr::filter(comparator == "(3) IRAs") 
+
+signal_data_wide %>%
+  dplyr::filter(substr(comparator, 1, 3) == "(2)") 
+
+# ---- maxsprt ----
+
 
 
 cv_tab <-
   signal_data_wide %>%
-  # dplyr::filter(thresh < 0.070) %>%
+  group_by(comparator) %>%
   summarise(
     rows = n(),
     sum_A = max(a),
@@ -266,10 +282,11 @@ cv_tab <-
     tot_n = sum_A + sum_C,
     .groups = "drop"
   ) %>%
+  ungroup() %>%
   mutate(
     # qtrs = interval(paste0(min_dte, "-01"), paste0(max_dte, "-01")) / months(1) / 4,
     qtrs = rows,
-    n_per_qtr = tot_n / qtrs,
+    n_per_qtr = floor(tot_n / qtrs),
     z = sum_C / sum_A
   ) 
 
@@ -281,21 +298,36 @@ get_maxsprt_cv_poss <-
   possibly(get_maxsprt_cv, otherwise = NA_real_, quiet = FALSE)
 
 
-
-cv <- with(cv_tab, get_maxsprt_cv_poss(tot_n, floor(n_per_qtr), z))
+cv_tab_test <- cv_tab %>% dplyr::filter(comparator == "(3) IRAs") 
+cv <- with(cv_tab_test, get_maxsprt_cv_poss(tot_n, floor(n_per_qtr), z))
 cv
 
 
+cv_tab <-
+  cv_tab %>%
+  mutate(
+    cv = pmap_dbl(.l = list(tot_n, n_per_qtr, z), .f = get_maxsprt_cv_poss)
+  )
+  
+cv_tab %>% dplyr::filter(comparator == "(3) IRAs") %>% pull(cv)
 
 maxsprt_dat <-
   signal_data_wide %>%
   mutate(
     maxllr = max_sprt_stat_(c_n = a, n = a + c, z = (c + d) / (a + b)),
-    rre = rr_est_(c_n = a, n = a + c, z = (c + d) / (a + b)),
-    cv = cv
+    rre = rr_est_(c_n = a, n = a + c, z = (c + d) / (a + b))
   )
 
-# maxsprt_dat
+maxsprt_dat <-
+  maxsprt_dat %>%
+  inner_join(
+    .,
+    cv_tab %>% select(comparator, cv),
+    "comparator"
+  )
+
+
+maxsprt_dat
 
 
 
@@ -319,10 +351,14 @@ maxsprt_dat %>%
 
 
 
+# ---- mult_adj_bcpnn ----
+
+
+
 # if it's multiple comparisons central need to sparing use alpha
-get_mult_compare_adj_alpha <- function(dat, alpha = 0.1) {
+get_mult_compare_adj_alpha <- function(vec, alpha = 0.1) {
   
-  n_reports <- nrow(dat)
+  n_reports <- length(vec)
   
   information_fracs <-  1:n_reports / n_reports
   
@@ -333,16 +369,19 @@ get_mult_compare_adj_alpha <- function(dat, alpha = 0.1) {
   
   # plot(1:n_reports, spend_obj$spend, main = "alpha spending func", xlab = "look")
   
-  return(bind_cols(dat, adj_alpha = spend_obj$spend))
+  # return(bind_cols(dat, adj_alpha = spend_obj$spend))
+  return(spend_obj$spend)
   
 }
 # test
-get_mult_compare_adj_alpha(maxsprt_dat)
+maxsprt_dat %>% 
+  dplyr::filter(comparator == "(3) IRAs") %>%
+  bind_cols(., adj_alpha = get_mult_compare_adj_alpha(.[["comparator"]]))
 
 
 get_sig_tab <- function(nA, nB, nC, nD, alpha = 0.1, n_mcmc = 1e+05) {
   
-  out_cols_of_interest <- c("est_name", "est_scale", "est", "alpha", "ci_lo", "ci_hi")
+  out_cols_of_interest <- c("est_name", "est_scale", "est", "alpha", "ci_lo")
   sig_tab <- pharmsignal::bcpnn_mcmc_signal(nA, nB, nC, nD, alpha = alpha, n_mcmc = n_mcmc)
   sig_tab <- sig_tab[, out_cols_of_interest]
   return(sig_tab)
@@ -355,7 +394,7 @@ get_sig_tab(30,  5512, 41, 17445)
 get_sig_tab_over_time <- function(dat, alpha = 0.1, n_mcmc = 1e+05) {
   
   n_tp <- nrow(dat)
-  dat <- get_mult_compare_adj_alpha(dat)
+  # dat <- get_mult_compare_adj_alpha(dat)
   
   sig_tab_over_time <-
     foreach(i = 1:n_tp, .combine = bind_rows, .packages = "dplyr") %do% {
@@ -374,13 +413,30 @@ get_sig_tab_over_time <- function(dat, alpha = 0.1, n_mcmc = 1e+05) {
 }
 
 bcpnn_data <-
+  maxsprt_dat %>% 
+  group_by(comparator) %>%
+  mutate(adj_alpha = get_mult_compare_adj_alpha(comparator)) %>%
+  ungroup()
+
+
+bcpnn_data %>% dplyr::filter(comparator == "(3) IRAs")
+bcpnn_data %>% dplyr::filter(comparator == "(4b) CU indi")
+
+  
+bcpnn_data <-
   bind_cols(
-    maxsprt_dat %>% select(comparator, dte),
-    get_sig_tab_over_time(maxsprt_dat)
+    bcpnn_data %>% select(comparator, dte),
+    get_sig_tab_over_time(bcpnn_data)
   )
 
 bcpnn_data %>%
   kable(.)
+
+
+
+# ---- plot_results ----
+
+
 
 plt_dat <-
   bind_rows(
@@ -420,5 +476,11 @@ plt_dat %>%
     col = "Comparison"
   )
 
+
+ggsave(
+  filename = "faers/vedol_panc_signal_detection_over_time.pdf",
+  width = 10,
+  height = 8
+)
 
 
