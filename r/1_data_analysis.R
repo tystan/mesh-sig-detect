@@ -73,7 +73,7 @@ furrr_seed3 <- furrr_options(seed = 3456)
 
 # ---- consts ----
 
-# arbitrarily, let's go with minimum cell count of 3 (should be discussed!)
+# arbitrarily, let's go with minimum cell count of 1 (will change based on context/application!)
 arbitrary_cell_min <- 1
 
 
@@ -81,17 +81,25 @@ arbitrary_cell_min <- 1
 # ---- funcs ----
 
 
-get_sig_tab <- function(nA, nB, nC, nD, alpha = 0.05, n_mcmc = 1e+05) {
+# do 90% CI only with lower == one sided 0.05
+get_sig_tab <- function(nA, nB, nC, nD, alpha = 0.10, method = "bcpnn", n_mcmc = 1e+05) { 
   
-  out_cols_of_interest <- c("est_name", "est_scale", "est", "alpha", "ci_lo", "ci_hi")
-  sig_tab <- pharmsignal::bcpnn_mcmc_signal(nA, nB, nC, nD, alpha = alpha, n_mcmc = n_mcmc)
+  out_cols_of_interest <- c("est_name", "est_scale", "est", "alpha", "ci_lo") # "ci_hi" (only care about lwr)
+  sig_tab <- NULL # initialise in scope
+  if (method == "bcpnn") {
+    sig_tab <- pharmsignal::bcpnn_mcmc_signal(nA, nB, nC, nD, alpha = alpha, n_mcmc = n_mcmc)
+  } else if (method == "prr") {
+    sig_tab <- pharmsignal::prr_signal(nA, nB, nC, nD, alpha = alpha)
+  } else {
+    stop("method for calcaultions unknown")
+  }
   sig_tab <- sig_tab[, out_cols_of_interest]
   # sig_tab <- bind_cols(tibble(mnth = mnth), sig_tab)
   return(sig_tab)
   
 }
 
-get_sig_tab_over_time <- function(dat, alpha = 0.05, n_mcmc = 1e+05) {
+get_sig_tab_over_time <- function(dat, alpha = 0.10, method = "bcpnn", n_mcmc = 1e+05) {
   
   n_tp <- nrow(dat)
   
@@ -102,7 +110,7 @@ get_sig_tab_over_time <- function(dat, alpha = 0.05, n_mcmc = 1e+05) {
         get_sig_tab(
           # mnth[i], 
           nA[i], nB[i], nC[i], nD[i], 
-          alpha = alpha, n_mcmc = n_mcmc
+          alpha = alpha, method = method, n_mcmc = n_mcmc
         )
       )
     }
@@ -111,8 +119,29 @@ get_sig_tab_over_time <- function(dat, alpha = 0.05, n_mcmc = 1e+05) {
   
 }
 
+
+
+# if it's multiple comparisons central need to sparing use alpha
+get_mult_compare_adj_alpha <- function(dat, alpha = 0.1) {
+  
+  n_reports <- nrow(dat)
+  
+  information_fracs <- (1:n_reports) / n_reports
+  
+  ### alternatives:
+  # spend_obj <- sfLDPocock(alpha = alpha, t = information_fracs, param = NULL)
+  # spend_obj <- sfLDOF(alpha = alpha, t = information_fracs, param = NULL)
+  spend_obj <- sfExponential(alpha = alpha, t = information_fracs, param = 0.5)
+  
+  # plot(1:n_reports, spend_obj$spend, main = "alpha spending func", xlab = "look")
+  
+  return(bind_cols(dat, adj_alpha = spend_obj$spend))
+  
+}
+
+
 # same as get_sig_tab_over_time(), however, alpha assumed included as column in data
-get_sig_tab_over_time_2 <- function(dat, n_mcmc = 1e+05) {
+get_sig_tab_over_time_2 <- function(dat, method = "bcpnn", n_mcmc = 1e+05) {
   
   n_tp <- nrow(dat)
   
@@ -124,6 +153,7 @@ get_sig_tab_over_time_2 <- function(dat, n_mcmc = 1e+05) {
           # mnth[i], 
           nA[i], nB[i], nC[i], nD[i], 
           alpha = adj_alpha[i], 
+          method = method,
           n_mcmc = n_mcmc
         )
       )
@@ -133,6 +163,13 @@ get_sig_tab_over_time_2 <- function(dat, n_mcmc = 1e+05) {
   
 }
 
+# test 
+data.frame(nA = 30, nB = 5512, nC = 41, nD = 17445, adj_alpha = 0.1) %>%
+  get_sig_tab_over_time_2(.)
+data.frame(nA = 30, nB = 5512, nC = 41, nD = 17445, adj_alpha = 0.1) %>%
+  get_sig_tab_over_time_2(., method = "prr")
+2 ^ c(0.432304, 0.7942907) # similar to prr on ratio scale
+log2(c(1.556277, 2.308667)) # similar to bcpnn on log2 scale
 
 # ---- load_dat ----
 
@@ -258,7 +295,7 @@ sra_cum_bcpnn %>%
 
 
 
-# ---- multcompar ----
+# ---- multcompar_bcpnn ----
 
 # sra_cum <- 
 #   sra_dat %>%
@@ -272,24 +309,8 @@ sra_cum <-
   nest(data = c(mnth, nA, nB, nC, nD))
 
 
-# if it's multiple comparisons central need to sparing use alpha
-get_mult_compare_adj_alpha <- function(dat) {
-  
-  n_reports <- nrow(dat)
-  
-  information_fracs <-  1:n_reports / n_reports
-  
-  ### alternatives:
-  # spend_obj <- sfLDPocock(alpha = 0.025, t = information_fracs, param = NULL)
-  # spend_obj <- sfLDOF(alpha = 0.025, t = information_fracs, param = NULL)
-  spend_obj <- sfExponential(alpha = 0.05, t = information_fracs, param = 0.5)
-  
-  # plot(1:n_reports, spend_obj$spend, main = "alpha spending func", xlab = "look")
-  
-  return(bind_cols(dat, adj_alpha = spend_obj$spend))
 
-}
-# test
+# test get_mult_compare_adj_alpha()
 get_mult_compare_adj_alpha(sra_cum$data[[11]])
 get_sig_tab_over_time_2(get_mult_compare_adj_alpha(sra_cum$data[[11]]))
 get_sig_tab_over_time(sra_cum$data[[11]])
@@ -309,7 +330,8 @@ toc()
 # test
 sra_cum$data[[11]] # check adj_alpha added as column in data
 
-### takes ~ 100 sec (i5-8400)
+### takes ~ 100 sec (i5-8400 6c/6t)
+### takes ~55 sec on laptop lols (i5 8th gen 4c/8t)
 tic()
 sra_cum <-
   sra_cum %>%
@@ -389,6 +411,125 @@ sra_cum_bcpnn_mc_adj %>%
 
 
 
+# ---- multcompar_prr ----
+
+# sra_cum <- 
+#   sra_dat %>%
+#   dplyr::filter(dat_type == "cumulative") 
+sra_cum <- 
+  cumul_qtrly_dat
+
+
+sra_cum <-
+  sra_cum %>%
+  nest(data = c(mnth, nA, nB, nC, nD))
+
+
+
+# test
+get_mult_compare_adj_alpha(sra_cum$data[[11]])
+get_sig_tab_over_time_2(get_mult_compare_adj_alpha(sra_cum$data[[11]]))
+get_sig_tab_over_time_2(get_mult_compare_adj_alpha(sra_cum$data[[11]]), method = "prr")
+get_sig_tab_over_time(sra_cum$data[[11]], method = "prr")
+
+tic()
+sra_cum <-
+  sra_cum %>%
+  mutate(
+    data = 
+      map(
+        .x = data, 
+        .f = get_mult_compare_adj_alpha
+      )
+  )
+toc()
+
+# test
+sra_cum$data[[11]] # check adj_alpha added as column in data
+
+get_sig_tab_over_time_2_prr <- function(dat) {
+  get_sig_tab_over_time_2(dat, method = "prr")
+}
+
+
+### takes ~2 sec on laptop (i5 8th gen 4c/8t)
+tic()
+sra_cum <-
+  sra_cum %>%
+  mutate(
+    sig_tab = 
+      future_map(
+        .x = data, 
+        .f = get_sig_tab_over_time_2_prr, # the alpha in data version
+        .options = furrr_seed1
+      )
+  )
+toc()
+
+
+
+# check
+sra_cum$sig_tab[[11]]
+
+
+sra_cum_prr_mc_adj <-
+  sra_cum %>%
+  unnest(cols = c(data, sig_tab)) %>%
+  mutate(
+    # dte = as_date(paste0(mnth, "-01"))
+    dte = 
+      as_date(paste0(
+        substr(mnth, 1, 5),
+        sprintf("%02.0f", (as.integer(substr(mnth, 7, 7)) - 1) * 3 + 1),
+        "-01"
+      ))
+  )
+
+sra_cum_prr_mc_adj
+
+
+# first signif
+prr_mc_adj_signif <-
+  sra_cum_prr_mc_adj %>%
+  group_by(grps, dat_type, thresh) %>%
+  dplyr::filter(ci_lo > 1) %>% # 1 is the critical value on ratio scale
+  arrange(dte) %>%
+  dplyr::filter(row_number() == 1) %>%
+  ungroup() %>%
+  rename(dte_reach_sig = dte)
+
+
+nrow(sra_cum_prr_mc_adj)
+sra_cum_prr_mc_adj <-
+  left_join(
+    sra_cum_prr_mc_adj,
+    prr_mc_adj_signif %>% select(grps, dat_type, thresh, dte_reach_sig),
+    c("grps", "dat_type", "thresh")
+  )
+nrow(sra_cum_prr_mc_adj)
+
+sra_cum_prr_mc_adj
+
+
+sra_cum_prr_mc_adj <- 
+  sra_cum_prr_mc_adj %>%
+  mutate(
+    dte_reach_sig = if_else(is.na(dte_reach_sig), as_date(today()), dte_reach_sig),
+    reach_sig = dte >= dte_reach_sig
+  )
+
+
+
+
+
+# ---- save3 ----
+
+
+sra_cum_prr_mc_adj %>%
+  write_parquet(., sink = "out/sra_cum_prr_mc_adj.parquet")
+
+
+
 
 
 # ---- maxsprt ----
@@ -460,7 +601,8 @@ toc()
 
 cv_tab
 cv_tab %>% dplyr::filter(is.na(cv))
-
+# remove analyses where thresholds don't allow enough events (extreme threshold values)
+# cv_tab <- cv_tab %>% dplyr::filter(!is.na(cv))
 
 maxsprt_dat <-
   sra_cum %>%
@@ -547,11 +689,72 @@ maxsprt_dat <-
   select(-reached_cv)
 
 
-# ---- save3 ----
+# ---- save4 ----
 
 
 maxsprt_dat %>%
   write_parquet(., sink = "out/sra_cum_maxsprt.parquet")
+
+
+
+
+# ---- plot_data ----
+
+
+
+plt_dat <-
+  bind_rows(
+    maxsprt_dat %>% 
+      select(comparator, dte, cv, reached_cv, val = maxllr) %>%
+      mutate(stat = "MaxSPRT (max LLR)"),
+    bcpnn_data %>% 
+      select(comparator, dte, val = ci_lo) %>%
+      mutate(cv = 0, reached_cv = as.integer(val > cv), stat = "IC (BCPNN, Lower 95% CI)")
+  ) 
+
+
+sig_reach_dat <-
+  plt_dat %>%
+  arrange(stat, comparator, dte) %>%
+  group_by(stat, comparator) %>%
+  dplyr::filter(reached_cv == 1) %>%
+  dplyr::filter(row_number() == 1) %>%
+  select(stat, comparator, dte_reached = dte) %>%
+  # now create separation between reached CV values when it occurs
+  group_by(stat, dte_reached) %>%
+  mutate(rep_dte = 1:n()) %>%
+  ungroup() %>%
+  mutate(dte_reached = dte_reached + days(10 * (rep_dte - 1))) %>%
+  select(-rep_dte)
+
+
+plt_dat <-
+  left_join(
+    plt_dat,
+    sig_reach_dat,
+    c("stat", "comparator")
+  )
+
+plt_dat %>%
+  ggplot(., aes(x = dte, y = val, col = comparator )) +
+  geom_hline(aes(yintercept = cv), alpha = 0.5) +
+  geom_vline(aes(xintercept = dte_reached, col = comparator), alpha = 0.5) +
+  geom_line(alpha = 0.5) +
+  geom_point() +
+  facet_wrap(~ stat, ncol = 1, scales = "free_y") +
+  scale_colour_tableau() +
+  theme_bw() +
+  labs(
+    x = "Quarter",
+    y = "Statistic",
+    col = "Comparison"
+  )
+
+
+
+
+
+
 
 
 
