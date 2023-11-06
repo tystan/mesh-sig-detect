@@ -1,0 +1,26 @@
+---
+title: "maxSPRT: maximise the spirit of pharmacovigilance"
+author: "{...} from QUMPRC @UniSA"
+format: revealjs
+---
+
+## Outline
+
+1. The problem
+    + The data
+    + Primer/example of multiple comparison problem
+2. Solutions
+    + Some terminology
+3. Comparison of solutions: RR vs LLR
+    + The idea behind RR to find disproportionality
+    + The idea behind maxSPRT to find disproportionality
+    + Similarities and summary
+    + Analysis degrees of freedom
+4. A note on Kuldorff and his work (the duality of human)
+5. Examples
+    + vedo vs panc
+    + ritux vs PG
+    + pelvic mesh vs pain
+    + covid-19 vaccines vs mastitis (faers data. Aus data?)
+
+
