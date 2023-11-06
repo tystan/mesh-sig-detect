@@ -66,8 +66,33 @@ knitr::read_chunk('r/1_data_analysis.R')
 ```{R, bcpnn_calcs}
 ```
 
+
+```{R, save1}
+```
+
+\newpage
+
 ## BCPNN with mult comp adjust
 
+```{R, multcompar_bcpnn}
+```
+
+
+```{R, save2}
+```
+
+\newpage
+
+## PRR with mult comp adjust
+
+```{R, multcompar_prr}
+```
+
+
+```{R, save3}
+```
+
+\newpage
 
 ## MaxSPRT
 
@@ -76,6 +101,19 @@ knitr::read_chunk('r/1_data_analysis.R')
 ```{R, maxsprt}
 ```
 
+```{R, save4}
+```
+
+
+
+\newpage
+
+# Ready plot data
+
+```{R, plot_data}
+#| eval: false
+
+```
 
 
 \newpage
