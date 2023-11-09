@@ -40,7 +40,7 @@ system.time({
   # set_membership
   set_mem <-
     read_parquet(
-      file = "faers/set_mem.parquet"
+      file = "faers/vedol_panc_set_mem.parquet"
     )
 })
 

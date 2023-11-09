@@ -13,6 +13,7 @@ suppressPackageStartupMessages({
   library("tictoc")    # measure time elapsed in calcs
   library("ggplot2") 
   library("ggrepel") 
+  library("ggthemes") 
   library("knitr")
   library("gsDesign")
   library("foreach")
@@ -330,8 +331,8 @@ toc()
 # test
 sra_cum$data[[11]] # check adj_alpha added as column in data
 
-### takes ~ 100 sec (i5-8400 6c/6t)
-### takes ~55 sec on laptop lols (i5 8th gen 4c/8t)
+### takes ~ 40 sec (i5-8400 6c/6t)
+### takes ~55 sec on laptop (i5 8th gen 4c/8t)
 tic()
 sra_cum <-
   sra_cum %>%
@@ -365,6 +366,11 @@ sra_cum_bcpnn_mc_adj <-
   )
 
 sra_cum_bcpnn_mc_adj
+
+with(sra_cum_bcpnn_mc_adj, table(dte, mnth, useNA = "ifany")) %>% 
+  as.data.frame() %>%
+  dplyr::filter(Freq > 0) %>%
+  arrange(mnth, dte)
 
 
 # first signif
@@ -487,6 +493,11 @@ sra_cum_prr_mc_adj <-
 
 sra_cum_prr_mc_adj
 
+with(sra_cum_prr_mc_adj, table(dte, mnth, useNA = "ifany")) %>% 
+  as.data.frame() %>%
+  dplyr::filter(Freq > 0) %>%
+  arrange(mnth, dte)
+
 
 # first signif
 prr_mc_adj_signif <-
@@ -510,6 +521,21 @@ nrow(sra_cum_prr_mc_adj)
 
 sra_cum_prr_mc_adj
 
+
+sra_cum_prr_mc_adj %>%
+  arrange(grps, thresh, dte, mnth) %>%
+  group_by(grps, thresh, dte, mnth) %>%
+  summarise(n = n()) %>%
+  ungroup() %>%
+  dplyr::filter(n > 1)
+
+sra_cum_prr_mc_adj %>%
+  dplyr::filter(thresh == "0.070", grepl("(a)", grps, fixed = TRUE))
+
+
+sra_cum_prr_mc_adj %>%
+  dplyr::filter(thresh == "0.050", grepl("(c)", grps, fixed = TRUE)) %>%
+  print(., n = nrow(.))
 
 sra_cum_prr_mc_adj <- 
   sra_cum_prr_mc_adj %>%
@@ -700,28 +726,39 @@ maxsprt_dat %>%
 
 # ---- plot_data ----
 
-
+maxsprt_dat <- read_parquet("out/sra_cum_maxsprt.parquet")
+bcpnn_dat <- read_parquet("out/sra_cum_bcpnn_mc_adj.parquet")
+prr_dat <- read_parquet("out/sra_cum_prr_mc_adj.parquet")
 
 plt_dat <-
   bind_rows(
-    maxsprt_dat %>% 
-      select(comparator, dte, cv, reached_cv, val = maxllr) %>%
-      mutate(stat = "MaxSPRT (max LLR)"),
-    bcpnn_data %>% 
-      select(comparator, dte, val = ci_lo) %>%
-      mutate(cv = 0, reached_cv = as.integer(val > cv), stat = "IC (BCPNN, Lower 95% CI)")
+    bcpnn_dat %>% 
+      mutate(
+        cv = 0, 
+        stat = "IC (BCPNN, Lower 95% CI)"
+      ) %>%
+      select(stat, grps, thresh, dte, cv, val = ci_lo, reach_sig, dte_reach_sig),
+    prr_dat %>% 
+      mutate(
+        cv = 1, 
+        stat = "RR (PRR, Lower 95% CI)"
+      ) %>%
+      select(stat, grps, thresh, dte, cv, val = ci_lo, reach_sig, dte_reach_sig),
+    maxsprt_dat %>%
+      mutate(stat = "MaxSPRT (max LLR)") %>%
+      select(stat, grps, thresh, dte, cv, val = maxllr, reach_sig, dte_reach_sig)
   ) 
 
 
 sig_reach_dat <-
   plt_dat %>%
-  arrange(stat, comparator, dte) %>%
-  group_by(stat, comparator) %>%
-  dplyr::filter(reached_cv == 1) %>%
+  arrange(stat, grps, thresh, dte) %>%
+  group_by(stat, grps, thresh) %>%
+  dplyr::filter(reach_sig == 1) %>%
   dplyr::filter(row_number() == 1) %>%
-  select(stat, comparator, dte_reached = dte) %>%
+  select(stat, grps, thresh, dte_reached = dte) %>%
   # now create separation between reached CV values when it occurs
-  group_by(stat, dte_reached) %>%
+  group_by(stat, thresh, dte_reached) %>%
   mutate(rep_dte = 1:n()) %>%
   ungroup() %>%
   mutate(dte_reached = dte_reached + days(10 * (rep_dte - 1))) %>%
@@ -732,16 +769,31 @@ plt_dat <-
   left_join(
     plt_dat,
     sig_reach_dat,
-    c("stat", "comparator")
+    c("stat", "grps", "thresh")
+  ) # %>%
+  # dplyr::filter(dte_reach_sig != dte_reached)
+
+
+plt_dat <-
+  plt_dat %>%
+  mutate(
+    stat = fct_inorder(stat)
   )
 
+
 plt_dat %>%
-  ggplot(., aes(x = dte, y = val, col = comparator )) +
+  dplyr::filter(thresh == "0.050", grepl("(c)", grps, fixed = TRUE))
+
+
+plt_dat %>%
+  dplyr::filter(thresh == "0.040", !grepl("(e)", grps, fixed = TRUE)) %>%
+  ggplot(., aes(x = dte, y = val, col = grps )) +
   geom_hline(aes(yintercept = cv), alpha = 0.5) +
-  geom_vline(aes(xintercept = dte_reached, col = comparator), alpha = 0.5) +
+  geom_vline(aes(xintercept = dte_reached, col = grps), alpha = 0.5) +
   geom_line(alpha = 0.5) +
   geom_point() +
-  facet_wrap(~ stat, ncol = 1, scales = "free_y") +
+  # facet_wrap(thresh ~ stat, ncol = 1, scales = "free_y") +
+  facet_grid(stat ~ thresh, scales = "free_y") +
   scale_colour_tableau() +
   theme_bw() +
   labs(
