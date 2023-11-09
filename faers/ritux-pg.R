@@ -288,6 +288,7 @@ cv_tab <-
     # qtrs = interval(paste0(min_dte, "-01"), paste0(max_dte, "-01")) / months(1) / 4,
     qtrs = rows,
     n_per_qtr = floor(tot_n / qtrs),
+    n_per_qtr = ifelse(n_per_qtr < 1, 1, n_per_qtr),
     z = sum_C / sum_A
   ) 
 
@@ -299,7 +300,7 @@ get_maxsprt_cv_poss <-
   possibly(get_maxsprt_cv, otherwise = NA_real_, quiet = FALSE)
 
 
-cv_tab_test <- cv_tab %>% dplyr::filter(comparator == "(3) IRAs") 
+cv_tab_test <- cv_tab %>% dplyr::filter(comparator == "(3) CD20s") 
 cv <- with(cv_tab_test, get_maxsprt_cv_poss(tot_n, floor(n_per_qtr), z))
 cv
 
@@ -310,7 +311,7 @@ cv_tab <-
     cv = pmap_dbl(.l = list(tot_n, n_per_qtr, z), .f = get_maxsprt_cv_poss)
   )
 
-cv_tab %>% dplyr::filter(comparator == "(3) IRAs") %>% pull(cv)
+cv_tab %>% dplyr::filter(comparator == "(3) CD20s") %>% pull(cv)
 
 maxsprt_dat <-
   signal_data_wide %>%
@@ -318,6 +319,27 @@ maxsprt_dat <-
     maxllr = max_sprt_stat_(c_n = a, n = a + c, z = (c + d) / (a + b)),
     rre = rr_est_(c_n = a, n = a + c, z = (c + d) / (a + b))
   )
+
+for (i in 1:nrow(signal_data_wide)) {
+  print(i)
+
+signal_data_wide %>%
+  dplyr::filter(row_number() == i) %>%
+  mutate(
+    maxllr = max_sprt_stat(c_n = a, n = a + c, z = (c + d) / (a + b)),
+    rre = rr_est(c_n = a, n = a + c, z = (c + d) / (a + b))
+  )
+}
+
+signal_data_wide %>%
+  dplyr::filter(row_number() == 126) %>%
+  mutate(
+    maxllr = max_sprt_stat(c_n = a, n = a + c, z = (c + d) / (a + b)),
+    rre = rr_est(c_n = a, n = a + c, z = (c + d) / (a + b))
+  )
+
+
+
 
 maxsprt_dat <-
   maxsprt_dat %>%

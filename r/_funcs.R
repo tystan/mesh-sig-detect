@@ -201,7 +201,9 @@ max_sprt_stat <- function(c_n, n, z, RR0 = 1) {
   # Drug and Vaccine Safety Surveillance. Sequential Analysis, 30(1): 58-78.
   
   z_rr <- z / RR0
-  if ((z_rr) * c_n / (n - c_n) <= 1) {
+  if ((c_n == 0) | ((n - c_n) == 0)) {
+    max_llr <- 0
+  } else if ((z_rr) * c_n / (n - c_n) <= 1) {
     max_llr <- 0
   } else if (c_n == n) {
     max_llr <- n * log(1 + z_rr)
@@ -220,6 +222,9 @@ max_sprt_stat <- function(c_n, n, z, RR0 = 1) {
 max_sprt_stat_ <- Vectorize(max_sprt_stat)
 
 rr_est <- function(c_n, n, z) {
+  if ((c_n == 0) | ((n - c_n) == 0) | (z == 0) | is.nan(z) | is.na(z) | is.infinite(z)) {
+    return(1) # null value
+  }
   return(z * c_n / (n - c_n))
 }
 
