@@ -217,8 +217,8 @@ signal_data_wide
 
 # edit exposure and outcome values for shorter expressions
 # they now take form: "ExOy" = `Exposure <x> Outcome <y>` where
-# <x> = "p" (positive) if exposure == "vedol", "n" (negative) otherwise
-# <y> = "p" (positive) if outcome == "panc", "n" (negative) otherwise
+# <x> = "p" (positive) if exposure == "ritux", "n" (negative) otherwise
+# <y> = "p" (positive) if outcome == "pg", "n" (negative) otherwise
 colnames(signal_data_wide) <- gsub("\\[rituximab\\]", "[E]", colnames(signal_data_wide))
 colnames(signal_data_wide) <- gsub("\\[PG\\]", "[O]", colnames(signal_data_wide))
 colnames(signal_data_wide) <- gsub("not \\[([EO])\\]", "[\\1]n", colnames(signal_data_wide))
@@ -259,15 +259,33 @@ signal_data_wide <-
   ) %>%
   ungroup()
 
+
+
 signal_data_wide %>%
-  dplyr::filter(comparator == "(3) CD20s") 
+  dplyr::filter(substr(comparator, 1, 3) == "(1)") %>%
+  print(., n = nrow(.))
 
 signal_data_wide %>%
   dplyr::filter(substr(comparator, 1, 3) == "(2)") %>%
   print(., n = nrow(.))
 
 signal_data_wide %>%
-  dplyr::filter(substr(comparator, 1, 3) == "(1)") 
+  dplyr::filter(substr(comparator, 1, 3) == "(3)") %>%
+  print(., n = nrow(.))
+
+signal_data_wide %>%
+  dplyr::filter(substr(comparator, 1, 3) == "(4)") %>%
+  print(., n = nrow(.))
+
+signal_data_wide %>%
+  dplyr::filter(substr(comparator, 1, 3) == "(5)") %>%
+  print(., n = nrow(.))
+
+signal_data_wide %>%
+  dplyr::filter(substr(comparator, 1, 3) == "(6)") %>%
+  print(., n = nrow(.))
+
+
 
 # ---- maxsprt ----
 
@@ -313,6 +331,7 @@ cv_tab <-
 
 cv_tab %>% dplyr::filter(comparator == "(3) CD20s") %>% pull(cv)
 
+# use vectorised() version of the functions
 maxsprt_dat <-
   signal_data_wide %>%
   mutate(
@@ -320,22 +339,22 @@ maxsprt_dat <-
     rre = rr_est_(c_n = a, n = a + c, z = (c + d) / (a + b))
   )
 
-for (i in 1:nrow(signal_data_wide)) {
-  print(i)
-
-signal_data_wide %>%
-  dplyr::filter(row_number() == i) %>%
-  mutate(
-    maxllr = max_sprt_stat(c_n = a, n = a + c, z = (c + d) / (a + b)),
-    rre = rr_est(c_n = a, n = a + c, z = (c + d) / (a + b))
-  )
-}
+# for (i in 1:nrow(signal_data_wide)) {
+#   print(i)
+# 
+# signal_data_wide %>%
+#   dplyr::filter(row_number() == i) %>%
+#   mutate(
+#     maxllr = max_sprt_stat(c_n = a, n = a + c, z = (c + d) / (a + b)),
+#     rre = rr_est(c_n = a, n = a + c, z = (c + d) / (a + b))
+#   )
+# }
 
 signal_data_wide %>%
   dplyr::filter(row_number() == 126) %>%
   mutate(
-    maxllr = max_sprt_stat(c_n = a, n = a + c, z = (c + d) / (a + b)),
-    rre = rr_est(c_n = a, n = a + c, z = (c + d) / (a + b))
+    maxllr = max_sprt_stat_(c_n = a, n = a + c, z = (c + d) / (a + b)),
+    rre = rr_est_(c_n = a, n = a + c, z = (c + d) / (a + b))
   )
 
 
@@ -360,6 +379,8 @@ maxsprt_dat <-
     # some cvs don't exist so those llr never reach cv
     reached_cv = if_else(is.na(cv), 0L, as.integer(maxllr > cv)),
     # create date for start of each quarter
+    fdayr = substr(qtr, 1, 4),
+    fdaqtr = as.integer(substr(qtr, 6, 6)),
     dte = 
       as_date(paste0(
         fdayr,
@@ -398,8 +419,9 @@ get_mult_compare_adj_alpha <- function(vec, alpha = 0.1) {
 }
 # test
 maxsprt_dat %>% 
-  dplyr::filter(comparator == "(3) IRAs") %>%
-  bind_cols(., adj_alpha = get_mult_compare_adj_alpha(.[["comparator"]]))
+  dplyr::filter(substr(comparator, 1, 3) == "(3)") %>%
+  cbind(., adj_alpha = get_mult_compare_adj_alpha(.[["comparator"]]))
+  
 
 
 get_sig_tab <- function(nA, nB, nC, nD, alpha = 0.1, n_mcmc = 1e+05) {
@@ -442,8 +464,8 @@ bcpnn_data <-
   ungroup()
 
 
-bcpnn_data %>% dplyr::filter(comparator == "(3) IRAs")
-bcpnn_data %>% dplyr::filter(comparator == "(4b) CU indi")
+bcpnn_data %>% dplyr::filter(substr(comparator, 1, 3) == "(3)")
+bcpnn_data %>% dplyr::filter(substr(comparator, 1, 3) == "(5)")
 
 
 bcpnn_data <-
@@ -519,13 +541,13 @@ plt_dat %>%
 
 
 ggsave(
-  filename = "faers/vedol_panc_signal_detection_over_time.pdf",
+  filename = "faers/fig/ritux_pg_signal_detection_over_time.pdf",
   width = 10,
   height = 8
 )
 
 ggsave(
-  filename = "faers/vedol_panc_signal_detection_over_time.png",
+  filename = "faers/fig/ritux_pg_signal_detection_over_time.png",
   width = 10,
   height = 8
 )
