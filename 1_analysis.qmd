@@ -30,11 +30,11 @@ knitr::read_chunk('r/1_data_analysis.R')
 ```{R, libs}
 ```
 
-## Parallel compution setup
+<!-- ## Parallel compution setup -->
 
 
-```{R, check_parallel_comp}
-```
+<!-- ```{R, check_parallel_comp} -->
+<!-- ``` -->
 
 ## Constants
 
@@ -111,7 +111,7 @@ knitr::read_chunk('r/1_data_analysis.R')
 # Ready plot data
 
 ```{R, plot_data}
-#| eval: false
+#| eval: true
 
 ```
 
@@ -120,7 +120,7 @@ knitr::read_chunk('r/1_data_analysis.R')
 
 # Session information
 
-```{R, end}
+```{R, close_future}
 ```
 
 

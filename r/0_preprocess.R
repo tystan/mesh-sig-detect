@@ -78,10 +78,11 @@ create_qtr_range <- function(start_qtr, end_qtr) {
       )
   } else {
     yr_diff <- e_yr - s_yr - 1
+    # print(yr_diff)
     qtr_vec <- 
       c(
         paste0(s_yr, "-Q", s_qr:4), 
-        paste0((s_yr + 1):(e_yr - 1), "-Q", rep(1:4, yr_diff)), 
+        paste0(rep((s_yr + 1):(e_yr - 1), each = 4), "-Q", rep(1:4, yr_diff)), 
         paste0(e_yr, "-Q", 1:e_qr)
       )
   }
@@ -89,13 +90,19 @@ create_qtr_range <- function(start_qtr, end_qtr) {
   return(tibble(qtr = qtr_vec))
   
 }
-# create_qtr_range("2013-Q2", "2012-Q4") ### eror tests
+# create_qtr_range("2013-Q2", "2012-Q4") ### error tests
 # create_qtr_range("2013-Q2", "2013-Q1")
 create_qtr_range("2013-Q2", "2013-Q2")
 create_qtr_range("2013-Q2", "2013-Q3")
 create_qtr_range("2013-Q2", "2014-Q1")
 create_qtr_range("2013-Q2", "2015-Q1")
 create_qtr_range("2013-Q4", "2015-Q1")
+
+create_qtr_range("2014-Q4", "2017-Q1")
+create_qtr_range("2012-Q4", "2017-Q4") %>% print(., n = 21)
+
+
+
 
 # ---- load_dat ----
 

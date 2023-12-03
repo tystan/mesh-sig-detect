@@ -36,11 +36,23 @@ source("r/_funcs.R")
 # EmpiricalCalibration
 
 
+### Note setting `plan(sequential)` for Quarto doc generation,
+# errors occur otherwise
+plan(sequential)
+
+# this only applies to the non-parallel (non-"future") operations
+set.seed(1234) 
+# this seed can be set in future_map() etc for reproducible parallel comp seeds 
+furrr_seed1 <- furrr_options(seed = 5678)
+furrr_seed2 <- furrr_options(seed = 9012)
+furrr_seed3 <- furrr_options(seed = 3456)
+furrr_seed4 <- furrr_options(seed = 7890)
+
+
 # ---- check_parallel_comp ----
 
 # options(future.globals.maxSize = 500 * 1024 ^ 2) # = 500 MiB
 options(future.globals.maxSize = 2e3 * 1024 ^ 2) # = 2 GB
-
 
 
 # furrr parallel workers/cores setup
@@ -64,19 +76,13 @@ tic()
 dev_null <- future_map(rep(2, thread_to_use), ~Sys.sleep(.x))
 toc()
 
-# this only applies to the non-parallel (non-"future") operations
-set.seed(1234) 
-# this seed can be set in future_map() etc for reproducible parallel comp seeds 
-furrr_seed1 <- furrr_options(seed = 5678)
-furrr_seed2 <- furrr_options(seed = 9012)
-furrr_seed3 <- furrr_options(seed = 3456)
+
 
 
 # ---- consts ----
 
 # arbitrarily, let's go with minimum cell count of 1 (will change based on context/application!)
 arbitrary_cell_min <- 1
-
 
 
 # ---- funcs ----
@@ -183,6 +189,29 @@ cumul_qtrly_dat <- read_parquet("dat/cumul_qtrly_dat.parquet")
 
 (thresholds <- sort(unique(sra_dat$thresh)))
 
+cumul_qtrly_dat
+
+
+# continuity_chk <-
+#   cumul_qtrly_dat %>%
+#   mutate(
+#     yr = as.integer(substr(mnth, 1, 4)),
+#     qtr = as.integer(substr(mnth, 7, 7))
+#   )
+# 
+# with(
+#   continuity_chk,
+#   table(
+#     yr,
+#     qtr,
+#     grps,
+#     thresh,
+#     useNA = "ifany"
+#   )
+# )
+# 
+# cumul_qtrly_dat %>%
+#   dplyr::filter(substr(grps, 1, 3) == "(b)", thresh == "0.040")
 
 
 # ---- bcpnn_calcs ----
@@ -218,7 +247,7 @@ get_sig_tab_over_time(sra_cum$data[[9]])
 ### for i5-8400/48GB 2133mhz memory
 # takes ~ 90 sec for monthly
 # takes ~ 40 sec for quarterly
-### divide by a fair bit for r9-7900X
+### divide by a fair bit for r9-5900X
 tic()
 sra_cum <-
   sra_cum %>%
@@ -332,7 +361,8 @@ toc()
 sra_cum$data[[11]] # check adj_alpha added as column in data
 
 ### takes ~ 40 sec (i5-8400 6c/6t)
-### takes ~55 sec on laptop (i5 8th gen 4c/8t)
+### takes ~ 55 sec on laptop (i5 8th gen 4c/8t)
+### takes ~ 10 sec (R9-5900X 12c/24t)
 tic()
 sra_cum <-
   sra_cum %>%
@@ -591,8 +621,48 @@ cv_tab %>%
   kable(., digits = 1)
 
 
+# maxsprt: create alternative CV tab 
 
 
+
+### create CV tab for alternative n_per_qtr and z ratios
+cv_tab_alts <-
+  tribble(
+    ~alt_str, ~modifier, ~mult,
+    "half_n", "n_per_qtr", 0.5,
+    "doub_n", "n_per_qtr", 2  ,
+    "half_z",         "z", 0.5,
+    "doub_z",         "z", 2  
+  )
+
+
+cv_tab_alts <-
+  cross_join(
+    cv_tab_alts,
+    cv_tab
+  ) %>%
+  arrange(
+    grps, thresh, modifier, alt_str
+  )
+
+if (4 * nrow(cv_tab) != nrow(cv_tab_alts)) {
+  stop("cross_join() has gone wrong")
+}
+
+cv_tab_alts <-
+  cv_tab_alts %>%
+  mutate(
+    n_per_qtr = if_else(modifier == "n_per_qtr", mult * n_per_qtr, n_per_qtr),
+    z         = if_else(modifier ==         "z", mult * z        , z        ),
+  )
+
+cv_tab_alts
+
+
+
+
+
+# maxsprt: create CVs 
 
 # testing/example
 row_i <- 1
@@ -602,7 +672,6 @@ get_maxsprt_cv(cv_tab$tot_n[row_i], floor(cv_tab$n_per_qtr[row_i]), cv_tab$z[row
 row_i <- 50
 cv_tab[row_i, ]
 get_maxsprt_cv(cv_tab$tot_n[row_i], floor(cv_tab$n_per_qtr[row_i]), cv_tab$z[row_i])
-
 
 
 
@@ -630,6 +699,36 @@ cv_tab %>% dplyr::filter(is.na(cv))
 # remove analyses where thresholds don't allow enough events (extreme threshold values)
 # cv_tab <- cv_tab %>% dplyr::filter(!is.na(cv))
 
+
+
+# maxsprt: create alt CVs 
+
+
+### takes ~ 120 sec (R9-5900X)
+tic()
+cv_tab_alts <-
+  cv_tab_alts %>%
+  # dplyr::filter(row_number() < 7) %>% ### testing
+  mutate(
+    cv =
+      future_pmap_dbl(
+        .l = list(tot_n, floor(n_per_qtr), z),
+        .f = ~get_maxsprt_cv_poss(..1, ..2, ..3),
+        .options = furrr_seed4
+      )
+  )
+toc()
+
+cv_tab_alts
+cv_tab_alts %>% dplyr::filter(is.na(cv))
+
+
+
+
+
+# maxsprt: create llr test stats 
+
+
 maxsprt_dat <-
   sra_cum %>%
   mutate(
@@ -638,7 +737,7 @@ maxsprt_dat <-
   )
 
 # maxsprt_dat
-
+# maxsprt_dat %>% dplyr::filter(thresh == "0.100", substr(grps, 1, 3) == "(a)")
 
 maxsprt_dat <-
   maxsprt_dat %>%
@@ -786,14 +885,72 @@ plt_dat %>%
 
 
 plt_dat %>%
-  dplyr::filter(thresh == "0.040", !grepl("(e)", grps, fixed = TRUE)) %>%
+  dplyr::filter(thresh == "0.030", !grepl("(e)", grps, fixed = TRUE)) %>%
   ggplot(., aes(x = dte, y = val, col = grps )) +
   geom_hline(aes(yintercept = cv), alpha = 0.5) +
   geom_vline(aes(xintercept = dte_reached, col = grps), alpha = 0.5) +
   geom_line(alpha = 0.5) +
   geom_point() +
   # facet_wrap(thresh ~ stat, ncol = 1, scales = "free_y") +
-  facet_grid(stat ~ thresh, scales = "free_y") +
+  facet_grid(
+    stat ~ thresh, 
+    scales = "free_y", 
+    labeller = labeller(thresh = function(x) paste0("Threshold: ", x))
+  ) +
+  scale_colour_tableau() +
+  theme_bw() +
+  labs(
+    x = "Quarter",
+    y = "Statistic",
+    col = "Comparison"
+  )
+
+ggsave(
+  filename = "fig/multi-grps_multi-test_signal-over-time_thresh-0.03.png", 
+  dpi = 900, width = 12, height = 8
+)
+
+
+plt_dat %>%
+  dplyr::filter(thresh == "0.070", !grepl("(e)", grps, fixed = TRUE)) %>%
+  ggplot(., aes(x = dte, y = val, col = grps )) +
+  geom_hline(aes(yintercept = cv), alpha = 0.5) +
+  geom_vline(aes(xintercept = dte_reached, col = grps), alpha = 0.5) +
+  geom_line(alpha = 0.5) +
+  geom_point() +
+  # facet_wrap(thresh ~ stat, ncol = 1, scales = "free_y") +
+  facet_grid(
+    stat ~ thresh, 
+    scales = "free_y", 
+    labeller = labeller(thresh = function(x) paste0("Threshold: ", x))
+  ) +
+  scale_colour_tableau() +
+  theme_bw() +
+  labs(
+    x = "Quarter",
+    y = "Statistic",
+    col = "Comparison"
+  )
+
+ggsave(
+  filename = "fig/multi-grps_multi-test_signal-over-time_thresh-0.07.png", 
+  dpi = 900, width = 12, height = 8
+)
+
+
+plt_dat %>%
+  dplyr::filter(thresh %in% c("0.040", "0.050", "0.060"), !grepl("(e)", grps, fixed = TRUE)) %>%
+  ggplot(., aes(x = dte, y = val, col = grps )) +
+  geom_hline(aes(yintercept = cv), alpha = 0.5) +
+  geom_vline(aes(xintercept = dte_reached, col = grps), alpha = 0.5) +
+  geom_line(alpha = 0.5) +
+  geom_point() +
+  # facet_wrap(thresh ~ stat, ncol = 1, scales = "free_y") +
+  facet_grid(
+    stat ~ thresh, 
+    scales = "free_y", 
+    labeller = labeller(thresh = function(x) paste0("Threshold: ", x))
+  ) +
   scale_colour_tableau() +
   theme_bw() +
   labs(
@@ -803,6 +960,12 @@ plt_dat %>%
   )
 
 
+
+
+ggsave(
+  filename = "fig/multi-grps_multi-test_signal-over-time_thresh-range-0.04-0.06.png", 
+  dpi = 900, width = 12, height = 8
+)
 
 
 
