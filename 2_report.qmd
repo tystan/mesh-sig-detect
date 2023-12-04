@@ -354,45 +354,87 @@ The cumulative number of pain topics in pelvic mesh $a_t$ increased sharply in Q
 
 
 
+Figure 2 demonstrates ...
 
-Words associated with "pain" comprised the most frequent clinical topic for pelvic mesh
-Optimal threshold for P(topic = "pain"| document) pain topics in pelvic mesh for earliest detection from maxSPRT and multiple adjusted BCPNN, depending on comparator (Figure 2): 
-
-* Hernia mesh  < 0.09
-* Other mesh    0.06 – 0.08
-* All other devices: Unstable for thresholds > 0.06
-
-
-Combining results, the best threshold is 0.06 
-Earliest time period  when signal was detected with and without adjustment for multiple testing and maxSPRT by year, with hernia mesh as a comparator:
+While not the values used for determining significance, they are the statistics that are most familiar to interested parties.
+The RR estimates for maxSPRT and PRR methods are of course identical, the methods differ in using the LLR and Wald testing respectively.
+The IC statistic is not directly comparable to RR, it does share similarities in that values above the null value represent disproportionate reporting rate in the cohort of interest.
+(include a 2^IC vs RR numeric example here)
 
 
-|         | |  
-|:--------|---------:|
-|BCPNN|       August 2014|      
-|BCPNN with adjustment for multiple testing | December 2014	|
-|maxSPRT | December 2014 |
-  
+The columns of the plot depict increasing pain topic thresholds. Within each threshold, the reporting ratio  estimates are reasonably stable after some initial fluctuation as a result of the uncertainty discrete nature of the data accumulated over time. However, the RR estimates for the larger thresholds show a general increase in the reporting ratio estimates over time. Interestingly, this is not the case for the BCPNN which actually decreases for the 0.08 threshold from 2016 onward. Common to all methods though are increased reporting ratio estimates for larger thresholds within their respective method suggesting that larger P(topic = "pain"| document) are more frequent in the pelvic mesh group. This higher threshold comes with a cost, that the higher barrier to pain events means insufficient data are available to produce a reporting ratio estimate early in the data accumulation. Further demonstrating competing constraints of a threshold sensitive enough to identify pain events and ... 
 
+Note these stats are not affected by multiple comparison adjustment
+
+Vertical lines are when H0 is rejected for the various methods which don't necessarily coincide with the largest reporting ratio estimate but with the ...
+
+Significance was reached at the same time for all methods (last quarter of 2014), except  for the PRR method at the 0.08 threshold which was a delayed an additional quarter.
+
+
+```{R, stat_over_time_plot2}
+#| echo: false
+#| fig.width: 12
+#| fig.height: 7
+#| fig-cap: "Reporting ratio estimates for the pelvic mesh v hernia mesh comparison over time for the three signal detection methods at different pain topic thresholds."
+```
+
+Figure 3 shows how significance is determined for the three methods. The vertical line is when significance is reached
+
+LLR valuyes have been truncated at 30 for 
+
+The CV values for each maxSPRT analysis for the different comparators are different (values here), although not obvious from the graph
 
 
 ```{R, stat_over_time_plot1}
 #| echo: false
-#| fig.width: 7
+#| fig.width: 10
 #| fig.height: 7
-#| fig-cap: "Test statistic values over time."
+#| fig-cap: "Disproportionality test statistic values for heneria mesh compared to three copmparison groups over time with their respective critical values. The P(topic = 'pain'| document) threshold is set at 0.04."
 ```
 
+
+Figure 4 shows how the different signal detection methods reached significance at different pain thresholds.
+
+The highest thresholds risk delayed signal detection or not reaching significance at all, especially in the least data rich comparison of pelvic mesh v hernia mesh.
+
+
+xxx where the thresholds that ensured all methods for the mesh only comparisons were detected prior to 2015
+
+while the prr allowed earlier detection in the pelvic v all comparison (2012 Q4) for thresholds xxxx, these thresholds were sub-optimal for the other methods of signal detection
 
 
 ```{R, time_to_sig_plot1}
 #| echo: false
-#| fig.width: 7
+#| fig.width: 10
 #| fig.height: 7
 #| fig-cap: "Time when methods reached critical values for signal detection."
 ```
 
-\newpage
+\clearpage
+
+
+<!-- Words associated with "pain" comprised the most frequent clinical topic for pelvic mesh -->
+<!-- Optimal threshold for P(topic = "pain"| document) pain topics in pelvic mesh for earliest detection from maxSPRT and multiple adjusted BCPNN, depending on comparator (Figure 4)  -->
+
+
+<!-- * Hernia mesh  < 0.09 -->
+<!-- * Other mesh    0.06 – 0.08 -->
+<!-- * All other devices: Unstable for thresholds > 0.06 -->
+
+
+<!-- Combining results, the best threshold is 0.06  -->
+<!-- Earliest time period  when signal was detected with and without adjustment for multiple testing and maxSPRT by year, with hernia mesh as a comparator: -->
+
+
+<!-- |         | |   -->
+<!-- |:--------|---------:| -->
+<!-- |BCPNN|       August 2014|       -->
+<!-- |BCPNN with adjustment for multiple testing | December 2014	| -->
+<!-- |maxSPRT | December 2014 | -->
+  
+
+
+
 
 # Conclusion 
 
