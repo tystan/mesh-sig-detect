@@ -384,6 +384,7 @@ LLR valuyes have been truncated at 30 for
 
 The CV values for each maxSPRT analysis for the different comparators are different (values here), although not obvious from the graph
 
+The Henernia mesh v Other mesh group serves a negative control as it is not expected to produce a significant signal. Indeed no signal detection method reaches significance for this comparison.
 
 ```{R, stat_over_time_plot1}
 #| echo: false
@@ -409,6 +410,17 @@ while the prr allowed earlier detection in the pelvic v all comparison (2012 Q4)
 #| fig.height: 7
 #| fig-cap: "Time when methods reached critical values for signal detection."
 ```
+
+
+
+```{R, time_to_sig_plot_alts}
+#| echo: false
+#| fig.width: 10
+#| fig.height: 7
+#| fig-cap: "Time when methods reached critical values for signal detection using different assumed a priori variables for CV calculation."
+```
+
+
 
 \clearpage
 

@@ -626,39 +626,32 @@ cv_tab %>%
 
 
 ### create CV tab for alternative n_per_qtr and z ratios
-cv_tab_alts <-
+alt_mults <-
   tribble(
     ~alt_str, ~modifier, ~mult,
+    "quar_n", "n_per_qtr", 0.25,
     "half_n", "n_per_qtr", 0.5,
     "doub_n", "n_per_qtr", 2  ,
+    "quad_n", "n_per_qtr", 4  ,
+    "quar_z",         "z", 0.25,
     "half_z",         "z", 0.5,
-    "doub_z",         "z", 2  
+    "doub_z",         "z", 2  ,
+    "quad_z",         "z", 4  
   )
 
 
 cv_tab_alts <-
   cross_join(
-    cv_tab_alts,
+    alt_mults,
     cv_tab
   ) %>%
   arrange(
-    grps, thresh, modifier, alt_str
+    grps, thresh, modifier, mult, alt_str
   )
 
-if (4 * nrow(cv_tab) != nrow(cv_tab_alts)) {
+if (nrow(alt_mults) * nrow(cv_tab) != nrow(cv_tab_alts)) {
   stop("cross_join() has gone wrong")
 }
-
-cv_tab_alts <-
-  cv_tab_alts %>%
-  mutate(
-    n_per_qtr = if_else(modifier == "n_per_qtr", mult * n_per_qtr, n_per_qtr),
-    z         = if_else(modifier ==         "z", mult * z        , z        ),
-  )
-
-cv_tab_alts
-
-
 
 
 
@@ -703,8 +696,17 @@ cv_tab %>% dplyr::filter(is.na(cv))
 
 # maxsprt: create alt CVs 
 
+cv_tab_alts <-
+  cv_tab_alts %>%
+  mutate(
+    n_per_qtr = if_else(modifier == "n_per_qtr", mult * n_per_qtr, n_per_qtr),
+    z         = if_else(modifier ==         "z", mult * z        , z        ),
+  )
 
-### takes ~ 120 sec (R9-5900X)
+cv_tab_alts
+
+
+### takes ~ 270 sec (R9-5900X)
 tic()
 cv_tab_alts <-
   cv_tab_alts %>%
@@ -723,13 +725,22 @@ cv_tab_alts
 cv_tab_alts %>% dplyr::filter(is.na(cv))
 
 
+# include original CVs too
+cv_tab_alts <-
+  bind_rows(
+    cv_tab_alts,
+    cv_tab %>% mutate(alt_str = "same_n", modifier = "n_per_qtr", mult = 1),
+    cv_tab %>% mutate(alt_str = "same_z", modifier = "z", mult = 1)
+  ) %>%
+  arrange(grps, thresh, modifier, mult, alt_str)
+
 
 
 
 # maxsprt: create llr test stats 
 
 
-maxsprt_dat <-
+maxsprt_dat_calcs <-
   sra_cum %>%
   mutate(
     maxllr = max_sprt_stat_(c_n = nA, n = nA + nC, z = (nC + nD) / (nA + nB)),
@@ -740,7 +751,7 @@ maxsprt_dat <-
 # maxsprt_dat %>% dplyr::filter(thresh == "0.100", substr(grps, 1, 3) == "(a)")
 
 maxsprt_dat <-
-  maxsprt_dat %>%
+  maxsprt_dat_calcs %>%
   left_join(
     .,
     cv_tab %>% select(grps, thresh, cv),
@@ -814,12 +825,114 @@ maxsprt_dat <-
   select(-reached_cv)
 
 
+
+
+# maxsprt: create llr test stats for alt CVs
+
+
+nrow(maxsprt_dat_calcs)
+maxsprt_dat_alts <-
+  maxsprt_dat_calcs %>%
+  left_join(
+    .,
+    cv_tab_alts %>% select(alt_str, modifier, mult, grps, thresh, cv),
+    c("grps", "thresh"),
+    relationship = "many-to-many"
+  ) %>%
+  arrange(grps, thresh, modifier, mult, alt_str, mnth) %>%
+  select(grps, thresh, modifier, mult, alt_str, everything())
+nrow(maxsprt_dat_alts)
+
+
+if(nrow(maxsprt_dat_alts) != (nrow(alt_mults) + 2) * nrow(maxsprt_dat_calcs)) {
+  stop("many-to-many join has not worked")
+}
+
+maxsprt_dat_alts
+
+
+maxsprt_dat_alts <-
+  maxsprt_dat_alts %>%
+  mutate(
+    # some cvs don't exist so those llr never reach cv
+    reached_cv = if_else(is.na(cv), 0L, as.integer(maxllr > cv)),
+    # create date for start of each quarter
+    dte = 
+      as_date(paste0(
+        substr(mnth, 1, 5),
+        sprintf("%02.0f", (as.integer(substr(mnth, 7, 7)) - 1) * 3 + 1),
+        "-01"
+      ))
+  )
+
+maxsprt_dat %>% dplyr::filter(is.na(cv))
+
+# have a peak
+maxsprt_dat_alts %>%
+  select(-dat_type) %>%
+  print(., n = 25)
+
+
+# first signif
+maxsprt_alts_signif <-
+  maxsprt_dat_alts %>%
+  group_by(grps, dat_type, thresh, modifier, mult, alt_str) %>%
+  dplyr::filter(reached_cv > 0) %>%
+  arrange(dte) %>%
+  dplyr::filter(row_number() == 1) %>%
+  ungroup() %>%
+  rename(dte_reach_sig = dte)
+
+
+nrow(maxsprt_dat_alts)
+maxsprt_dat_alts <-
+  left_join(
+    maxsprt_dat_alts,
+    maxsprt_alts_signif %>% 
+      select(grps, dat_type, thresh, modifier, mult, alt_str, dte_reach_sig),
+    c("grps", "dat_type", "thresh", "modifier", "mult", "alt_str")
+  )
+nrow(maxsprt_dat_alts)
+
+maxsprt_dat_alts
+
+
+maxsprt_dat_alts <- 
+  maxsprt_dat_alts %>%
+  mutate(
+    dte_reach_sig = if_else(is.na(dte_reach_sig), as_date(today()), dte_reach_sig),
+    reach_sig = dte >= dte_reach_sig
+  )
+
+# these are where the maxllr has dropped under the CV after exceeding it previously
+maxsprt_dat_alts %>%
+  dplyr::filter(
+    is.na(reach_sig) | 
+      is.na(reached_cv) | 
+      (as.logical(reached_cv) != reach_sig)
+  )
+
+
+
+maxsprt_dat_alts <- 
+  maxsprt_dat_alts %>%
+  select(-reached_cv)
+
+
+
+
+
 # ---- save4 ----
 
 
 maxsprt_dat %>%
   write_parquet(., sink = "out/sra_cum_maxsprt.parquet")
 
+
+
+
+maxsprt_dat_alts %>%
+  write_parquet(., sink = "out/sra_cum_maxsprt_alt_cvs.parquet")
 
 
 

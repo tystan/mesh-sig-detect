@@ -281,14 +281,15 @@ sra_stat_plt <-
   # dplyr::filter(thresh %in% sprintf("%0.3f", seq(0.02, 0.08, by = 0.02))) %>%
   dplyr::filter(thresh %in% thresh_use_str) %>%
   ### only keep pelvic mesh as target vs whatever comparator
-  dplyr::filter(grepl("^.*pelvic.* v ", grps)) %>%
-  # dplyr::filter(grepl("^\\(a\\)", grps)) %>%
+  # dplyr::filter(grepl("^.*pelvic.* v ", grps)) %>%
+  dplyr::filter(grepl("^\\([a-d]\\)", grps)) %>%
   mutate(
     grps = gsub(" v ", "\nv\n", grps),
     grps = gsub("\\([a-z]\\) ", "", grps),
     grps = gsub("_", " ", grps),
     grps = gsub("pelvic mesh", "Pelvic mesh", grps),
     grps = gsub("hernia mesh", "Hernia mesh", grps),
+    grps = gsub("other mesh", "Other mesh", grps),
     grps = fct_inorder(grps),
     stat = fct_inorder(stat)
   ) 
@@ -314,7 +315,8 @@ sra_stat_plt <-
       ),
     `Test` = fct_inorder(`Test`),
     # truncate extreme values
-    test_stat = if_else((test_stat > 30) & (stat == "maxSPRT"), 30, test_stat)
+    test_stat = if_else((test_stat > 30) & (stat == "maxSPRT"), 30, test_stat),
+    dte_reach_sig = if_else(dte_reach_sig > "2017-12-01", as_date(NA), dte_reach_sig)
   ) 
 
 
@@ -576,6 +578,75 @@ ggsave(
 
 
 
+
+# ---- time_to_sig_plot_alts ----
+
+
+sra_cum_maxsprt_alts <-  read_parquet("out/sra_cum_maxsprt_alt_cvs.parquet")
+
+date_signif_dat_alts <-
+  sra_cum_maxsprt_alts %>%
+  mutate(
+    stat = "maxSPRT",
+    alt_str = fct_inorder(alt_str)
+  ) %>%
+  group_by(stat, grps, dat_type, thresh, modifier, mult, alt_str) %>%
+  arrange(dte) %>%
+  dplyr::filter(reach_sig) %>%
+  dplyr::filter(row_number() == 1) %>%
+  ungroup() %>%
+  arrange(stat, grps, dat_type, thresh, modifier, mult, alt_str) 
+
+
+n_mult <- length(unique(sprintf("%1.2f", date_signif_dat_alts$mult)))
+
+signif_plt_alts <-
+  date_signif_dat_alts %>%
+  ### only keep pelvic mesh as target vs whatever comparator
+  dplyr::filter(grepl("^.*pelvic.* v ", grps)) %>%
+  mutate(
+    mult_fct = fct_inorder(sprintf("%1.2f", mult)),
+    dte_reach_sig = dte_reach_sig + (n_mult - as.numeric(mult_fct)) * days(20),
+    grps = gsub("\\([a-z]\\) ", "", grps),
+    grps = gsub("_", " ", grps),
+    grps = gsub("pelvic mesh", "Pelvic mesh", grps),
+    grps = gsub("hernia mesh", "Hernia mesh", grps),
+    # grps = str_to_sentence(grps),
+    grps = gsub(" v ", "\nv\n", grps, fixed = TRUE),
+    grps = fct_inorder(grps)
+    # stat = fct_inorder(stat)
+  )
+
+
+
+multiplier_scale <- 
+  rev(rev(hcl.colors(length(unique(signif_plt_alts$mult)) + 1, "SunsetDark"))[-1])
+
+
+# levels(signif_plt$grps)
+
+signif_plt_alts %>%
+  arrange(grps, thresh) %>%
+  ggplot(., aes(x = dte_reach_sig, y = as.numeric(thresh), col = mult_fct)) +
+  geom_point(alpha = 0.4) +
+  geom_path(aes(group = alt_str)) +
+  scale_colour_manual(values = multiplier_scale) +
+  # scale_colour_tableau(palette = "Color Blind", direction = -1) +
+  # scale_colour_viridis_d(option = "E") +
+  facet_grid(modifier ~ grps) +
+  # facet_wrap( ~ grps, ncol = 1) +
+  theme_bw() +
+  theme(text = element_text(family = "serif")) +
+  labs(
+    x = expression("Date" ~ H[0] ~ "rejected (null hypothesis of no signal)"),
+    y = "Threshold for P(topic = 'pain' | doc) to be classed a 'pain' adverse event",
+    col = "Multiplier applied\nto assumed a priori\nvariable"
+  )
+
+ggsave(
+  filename = "fig/time_to_signal_method_facets_alt_cvs.png", 
+  dpi = 900, width = 9, height = 9
+)
 
 
 
