@@ -30,7 +30,12 @@ knitr::read_chunk('r/1_data_analysis.R')
 ```{R, libs}
 ```
 
-<!-- ## Parallel compution setup -->
+```{R}
+# processing start time
+t0 <- proc.time()[3]
+```
+
+<!-- ## Parallel computation setup -->
 
 
 <!-- ```{R, check_parallel_comp} -->
@@ -125,6 +130,11 @@ knitr::read_chunk('r/1_data_analysis.R')
 
 
 ```{R}
+cat(
+  "Completed document generation in", 
+  sprintf("%6.1f", proc.time()[3] - t0),
+  "seconds \n"
+)
 # Sys.info()[!(names(Sys.info()) %in% c("login", "nodename"))] %>% 
 #   as.data.frame(.)
 format(Sys.time(), '%d %b %Y')

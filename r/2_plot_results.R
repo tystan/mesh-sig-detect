@@ -645,7 +645,7 @@ signif_plt_alts %>%
 
 ggsave(
   filename = "fig/time_to_signal_method_facets_alt_cvs.png", 
-  dpi = 900, width = 9, height = 9
+  dpi = 900, width = 10, height = 7
 )
 
 

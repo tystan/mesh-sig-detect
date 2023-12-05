@@ -49,6 +49,8 @@ furrr_seed3 <- furrr_options(seed = 3456)
 furrr_seed4 <- furrr_options(seed = 7890)
 
 
+
+
 # ---- check_parallel_comp ----
 
 # options(future.globals.maxSize = 500 * 1024 ^ 2) # = 500 MiB
