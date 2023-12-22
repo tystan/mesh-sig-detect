@@ -1,16 +1,16 @@
 ---
 title: "Report"
 subtitle: "Signal detection of spontaneous medical device reports over time accounting for multiple comparisons"
-author: "Ty Stanford, Lan Kelly, et al."
+author: "Ty Stanford, Lan Kelly, Marianne Gillam, et al."
 format:
-  docx:
-    toc: true
-    highlight-style: atom-one
-    number-sections: true 
   pdf:
     toc: true
     highlight-style: atom-one
     number-sections: true
+  docx:
+    toc: true
+    highlight-style: atom-one
+    number-sections: true 
 editor: source
 ---
 
@@ -79,9 +79,17 @@ The pelvic mesh was removed from market in ...
 There is still ongoing heath, financial and legal fallout from the device's use [Dec 22](https://www.abc.net.au/news/2022-12-04/mesh-implant-class-action-shine-lawyers-payout-dispute/101728850) 
 
 
-[talk about standard signal detection in structure databases]
 
-[has there been any NLP of free-text in adverse events/safety monitoring?]
+
+Post-market safety signal detection plays an important role in ongoing monitoring of medical devices and medicines at large scales. The oft-considered gold standard of clinical trials are normally targeted for effectiveness outcomes and do not have to the scope or data abundance to monitor multi-system safety signals. Large spontaneous report databases provide large-scale data, whether nationally or internationally, that can be mined to uncover disproportionate numbers of adverse events reported based on exposure groups (medical device classifications for example). Uncovered relationships of disproportionate adverse event reporting may be used for screening of more targeted investigations of the exposure-outcome pairs for patient safety.
+
+Oftentimes, signal detection is performed at snapshots in time based on specific concerns or interest in the exposure or outcome. A more complicated periodic re-assessment of safety signals is also possible. This can be done by alpha-adjustment of the  to account for multiple looks at the estimates over time, or use methods like maxSPRT which also consider multiple looks at the potential signal estimates, however the detection thresholds are calculated so the type I error remains nominal for the entirety of the follow-up.  
+
+Considered here are the periodic signal detection methods as we aim to retrospectively determine, if periodic evaluation of safety signals (specifically for pain) were assessed for pelvic mesh, at what point would a signal have been detected.
+
+Traditionally, signal detection mining has used structured data in spontaneous databases based on structured reports from patients, medical practitioners, government bodies or device or medication sponsors. However, with both the increase in digital data such as free-text data, maturing natural language processing machine learning methods and increased computational power, an opportunity is available to leverage free-text data in safety signal detection. 
+
+[has there been any NLP of free-text in adverse events/safety monitoring? Need to do literature search of examples + references]
 
 The purpose of this study was to develop an end-to-end pipeline, utilising free-text information to screen for medical device safety issues, using an Australian spontaneous report database of medical device adverse events (Database of Adverse Event Notifications, DAEN). The study aims to evaluate the feasibility of disproportional reporting rate methods to detect signals in free-text descriptions of adverse events using natural language processing (NLP) to classify DAEN reports into topics by:
 
@@ -102,11 +110,14 @@ The purpose of this study was to develop an end-to-end pipeline, utilising free-
 
 
 
-The DAEN was searched for reports on pelvic and hernia mesh from 2012-2017. 
-Topic modelling, a Natural Language Processing technique, was used to profile the unstructured text into mixtures of clinically relevant topics. 
-A report was considered to contain a particular topic $X$ if the probability it contains words relating to the topic, P(topic = $X$| document), was over a certain threshold, which was varied in the analysis.
+The DAEN spontaneous database was searched for free-text reports on all medical devices from 2012-2017 with an eye to focus on mesh devices and pelvic mesh, specifically, reporting pain as a post surgery outcome. 
+Topic modelling, a Natural Language Processing (NLP) technique, was used to profile the unstructured text into mixtures of clinically relevant topics. 
+A report was considered to contain a particular topic $X$ if the probability it contains words relating to the topic, P(topic = $X$| document), was over a certain threshold, therefore denoting a presumptive "pain" spontaneous event.
 
-Disproportionality analysis was used to detect potential signals from the most frequent clinical topic from pelvic mesh, with hernia mesh and other devices used as comparators. Measures are based on a $2 {\times} 2$ contingency table for the number of adverse events with and without the most frequent topic in the device of interest and the comparator. Testing was performed on the DAEN at quarterly intervals, if new data were accumulated in the interval, over the study period, commencing in 2012. 
+
+Disproportionality analysis was used to detect potential signals from the most frequent clinical topic from pelvic mesh, with hernia mesh and other devices used as comparators. Measures are based on a $2 {\times} 2$ contingency table for the number of adverse events with and without the most frequent topic in the device of interest and the comparator. 
+
+Testing was performed on the DAEN at quarterly intervals, if new data were accumulated in the interval, over the study period, commencing in 2012. 
 
 
 
@@ -182,22 +193,23 @@ We will consider the three signal detection statistics below:
 * the maxSPRT statistic
 
 
-As signal detection is being undertaken repeatedly as data are being accumulated, alpha spending needs to be considered. The below table classifies the aforementioned signal detection methods by their null hypothesis as well as whether they control for the family-wise error rate (FWER)
+As signal detection is being undertaken repeatedly as data are being accumulated, alpha spending needs to be considered. The below table classifies the aforementioned signal detection methods by their null hypothesis as well as how they control for the family-wise error rate (FWER).
 
 
-| Null hypothesis        | non-FWER version | FWER version |
+| Method | Null hypothesis        |  FWER adjustment |
 |:--------|---------:|----------:|
-| Ratio of pain AEs to all AEs in target and comparator groups has a ratio of 1 |      PRR |  binary, group sequential  maxSPRT|
-|Independence of pain AEs and target group (based on marginal counts)|       IC |        IC with $\alpha$-spending scheme|
+| PRR | Ratio of pain AEs to all AEs in target and comparator groups has a ratio of 1 | PRR with $\alpha$-spending scheme | 
+|BCPNN IC |Independence of pain AEs and target group (based on marginal counts) |        IC with $\alpha$-spending scheme| 
+| maxSPRT (binary, group sequential)  | Log-likelihood ratio test statistic below null derived threshold | (built in) |
 
 
-We will demonstrate how the group sequential binary maxSPRT, as described in previous work, is equivalent to a FWER-controlled PRR method of signal detection.
+We will demonstrate how the group sequential binary maxSPRT, as described in previous work, is equivalent to a natively FWER-controlled PRR method of signal detection using the log-likelihood ratio test for significance.
 
 
 
 Methods used included the Bayesian Confidence Propagation Neural Network (BCPNN) and the maximised Sequential Probability Ratio Test (maxSPRT) which accounted for multiple testing through alpha spending. The BCPNN was used with and without adjusting for multiple testing. The test statistic for BCPNN is the information criterion (IC) which represents the log2 of the ratio of observed to expected adverse events (0 under the null hypothesis of no association between the topic and pelvic mesh).
 
-maxSPRT was developed for near continuous sequential monitoring (called “group sequential” when monitored at discrete time points or after set accumulatios of events), maintaining the correct overall alpha level. The test statistic is based on the maximized (log-)likelihood ratio statistic which uses the observed and expected (under the null hypothesis) reporting ratio assuming binomial adverse event accumulation. The critical value of the likelihood ratio statistic is determined by the 100(1-α)% quantile of possible likelihood ratio statistics from binomial adverse event counts under the null hypothesis over the entire group sequential follow-up.
+maxSPRT was developed for near continuous sequential monitoring (called “group sequential” when monitored at discrete time points or after set accumulations of events), maintaining the correct overall alpha level. The test statistic is based on the maximized (log-)likelihood ratio statistic which uses the observed and expected (under the null hypothesis) reporting ratio assuming binomial adverse event accumulation. The critical value of the likelihood ratio statistic is determined by the 100(1-α)% quantile of possible likelihood ratio statistics from binomial adverse event counts under the null hypothesis over the entire group sequential follow-up.
 
 
 
@@ -318,13 +330,20 @@ Jennison C and Turnbull BW (2000), Group Sequential Methods with Applications to
 Lan, KKG and DeMets, DL (1983), Discrete sequential boundaries for clinical trials. Biometrika; 70:659-663.
 }
 
+## Software and code availability
+
+
+All analysis was performed in R (version X.Y.Z) with the assistance of the `Sequential` (ref) and `EmpiricalCalibration` (ref) packages for maxSPRT threshold calculation. All data and code is available at https://github.com/tystan/mesh-sig-detect.
+
+
+
 
 \newpage
 
 
 # Results
 
-Pelvic mesh had the highest proportion of reports including the word "pain", followed by other and hernia mesh (Figure 1).
+A summary depiction of the NLP processed data is shown in Figure 1. All spontaneous reports (n= ) were partitioned by device type as either pelvic mesh, hernia mesh, other mesh or other devices. Pelvic mesh had the highest proportion of reports that included the word "pain" in the free text, followed by other and hernia mesh. The stacked and stratified histograms in Figure 1 depict the NLP estimated P(pain|doc) distributions. Pelvic mesh had the largest proportion of non-0 estimated P(pain|doc) values when "pain" was used in the free-text. Notably, other mesh had a similar proportion of non-0 estimated P(pain|doc) values when "pain" wasn't used in the free-text. It is worth remarking that these are the summary data at the conclusion of data follow-up in 2017 so the accumulation of data may not show such stark difference in pain adverse events (whether literal "pain" text or P(pain|doc) estimated) between the device categories.
 
 
 
@@ -342,7 +361,7 @@ Pelvic mesh had the highest proportion of reports including the word "pain", fol
 #| include: false
 ```
 
-The cumulative number of pain topics in pelvic mesh $a_t$ increased sharply in Q4 2014 compared with the previous quarter. The table shows the cumulative $2 {\times} 2$ table each quarter up to $t=$ 2015-Q1 with hernia mesh as the comparator (and pain topic threshold of 0.05).
+To illustrate the quarterly accumulation of spontaneous report data, Table 5 is a snippet (each quarter up to $t=$ 2015-Q1) of the cumulative number of pelvic mesh reports with $P(pain|doc) \geq 0.05 = p_t$  and $P(pain|doc) < 0.05$, labelled $a_t$ and $b_t$ respectively, as well as the cumulative number of hernia mesh reports with $P(pain|doc) \geq 0.05$  and $P(pain|doc) < 0.05$, similarly labelled $c_t$ and $d_t$ . Each row of the table can be considered the cumulative $2 {\times} 2$ contingency at time $t$. It is notable the number of presumptive pain related adverse events in pelvic mesh spontaneous reports ($a_t$) increased sharply in Q4 2014 compared with the previous quarter. This pattern was consistent across the various thresholds $p_t$ considered in the analyses. [Include the reason this might be the case here]. 
 
 
 ```{R, example_data}
@@ -354,21 +373,26 @@ The cumulative number of pain topics in pelvic mesh $a_t$ increased sharply in Q
 
 
 
-Figure 2 demonstrates ...
-
-While not the values used for determining significance, they are the statistics that are most familiar to interested parties.
-The RR estimates for maxSPRT and PRR methods are of course identical, the methods differ in using the LLR and Wald testing respectively.
-The IC statistic is not directly comparable to RR, it does share similarities in that values above the null value represent disproportionate reporting rate in the cohort of interest.
-(include a 2^IC vs RR numeric example here)
 
 
-The columns of the plot depict increasing pain topic thresholds. Within each threshold, the reporting ratio  estimates are reasonably stable after some initial fluctuation as a result of the uncertainty discrete nature of the data accumulated over time. However, the RR estimates for the larger thresholds show a general increase in the reporting ratio estimates over time. Interestingly, this is not the case for the BCPNN which actually decreases for the 0.08 threshold from 2016 onward. Common to all methods though are increased reporting ratio estimates for larger thresholds within their respective method suggesting that larger P(topic = "pain"| document) are more frequent in the pelvic mesh group. This higher threshold comes with a cost, that the higher barrier to pain events means insufficient data are available to produce a reporting ratio estimate early in the data accumulation. Further demonstrating competing constraints of a threshold sensitive enough to identify pain events and ... 
+While not the values used for determining significance, Figure 2 demonstrates the statistics, termed here as "reporting ratio statistics", over the follow-up period that are most likely the familiar signal detection estimates to the reader. The specific comparison seen is for pelvic mesh (target) vs hernia mesh (comparator) for four different $p_t$ thresholds. 
+The RR estimates for maxSPRT and PRR methods are of course identical, the methods differ in using the LRT and Wald tests respectively.
+The IC statistic is not directly comparable to RR, it does share similarities in that values above the null value of 0 (on the log2 scale) represent disproportionate reporting rate in the cohort of interest. Plotted however is $2^IC$ as this is a ratio-scale statistic that can be more easily compared to a RR. Note these reporting ratio statistics are not affected by multiple comparison adjustment.
 
-Note these stats are not affected by multiple comparison adjustment
 
-Vertical lines are when H0 is rejected for the various methods which don't necessarily coincide with the largest reporting ratio estimate but with the ...
-
+Vertical lines are when H0 is rejected for the various methods which don't necessarily coincide with the largest reporting ratio estimate but with the testing procedure used.
+<!-- The vertical black lines in Figure 2 depict when a significance was reached for each method, all but one occurring at Q4 2014 time point as commented on previously.  -->
 Significance was reached at the same time for all methods (last quarter of 2014), except  for the PRR method at the 0.08 threshold which was a delayed an additional quarter.
+The jumps in the reporting ratios were larger for larger thresholds, however it should be noted higher thresholds stopped reporting ratios being estimated until further into the follow up because less spontaneous report free text records are classified as pain events as a result of elevated estimated probability criteria (threshold). 
+
+(include a 2^IC vs RR numeric example here to compare reporting ratios)
+
+
+The columns of Figure 2 depict increasing pain topic thresholds. Within each threshold, the reporting ratio  estimates are reasonably stable after some initial fluctuation as a result of the uncertainty discrete nature of the data accumulated over time. However, the RR estimates for the larger thresholds show a general increase in the reporting ratio estimates over time. Interestingly, this is not the case for the BCPNN which actually decreases for the 0.08 threshold from 2016 onward. Common to all methods though are increased reporting ratio estimates for larger thresholds within their respective method suggesting that larger P(topic = "pain"| document) are more frequent in the pelvic mesh group. This higher threshold comes with a cost, that the higher barrier to pain events means insufficient data are available to produce a reporting ratio estimate early in the data accumulation. Further demonstrating competing constraints of a threshold low enough to detect sufficient presumptive pain events but high enough (specific enough) to discriminate between non-pain and pain events.
+
+
+
+
 
 
 ```{R, stat_over_time_plot2}
@@ -378,13 +402,11 @@ Significance was reached at the same time for all methods (last quarter of 2014)
 #| fig-cap: "Reporting ratio estimates for the pelvic mesh v hernia mesh comparison over time for the three signal detection methods at different pain topic thresholds."
 ```
 
-Figure 3 shows how significance is determined for the three methods. The vertical line is when significance is reached
+Figure 3 shows how significance is determined for the three methods over time and for various comparisons (a fixed $p_t = 0.04$ is used). Similarly to Figure 2, the vertical lines shows when significance is reached. The CV values for each maxSPRT analysis for the different comparators are different (values here), although not obvious from the graph. Also note that the LLR values have been truncated when exceeding 30 to not dominate the y-axis scaling. 
 
-LLR valuyes have been truncated at 30 for 
+The Hernia mesh v Other mesh group in the final column servea a negative control as it is not expected to produce a significant signal. Indeed no signal detection method reaches significance for this comparison.
 
-The CV values for each maxSPRT analysis for the different comparators are different (values here), although not obvious from the graph
-
-The Henernia mesh v Other mesh group serves a negative control as it is not expected to produce a significant signal. Indeed no signal detection method reaches significance for this comparison.
+Significance is reached in all methods when hernia mesh is the target. However the comparisons hernia mesh vs pelvic mesh and hernia mesh vs pelvic/other mesh rejected the null hypothesis a year later than the hernia mesh vs pelvic/other mesh/other devices comparison. This may be a result of difference safety profiles for non-mesh devices in the comparator counts ($c_t$ and $d_t$). Consideration needs to be made about whether this is an appropriate comparison. Discussed in other articles (refs).
 
 ```{R, stat_over_time_plot1}
 #| echo: false
@@ -394,14 +416,11 @@ The Henernia mesh v Other mesh group serves a negative control as it is not expe
 ```
 
 
-Figure 4 shows how the different signal detection methods reached significance at different pain thresholds.
-
-The highest thresholds risk delayed signal detection or not reaching significance at all, especially in the least data rich comparison of pelvic mesh v hernia mesh.
-
+Figure 4 shows how the different signal detection methods reached significance at different pain thresholds $p_t$. The highest thresholds risk delayed signal detection or not reaching significance at all, especially in the least data rich comparison of pelvic mesh v hernia mesh.
 
 xxx where the thresholds that ensured all methods for the mesh only comparisons were detected prior to 2015
 
-while the prr allowed earlier detection in the pelvic v all comparison (2012 Q4) for thresholds xxxx, these thresholds were sub-optimal for the other methods of signal detection
+while the PRR allowed earlier potential signal detection in the pelvic mesh vs pelvic/other mesh/other devices comparison (2012 Q4) for thresholds xxxx, these thresholds were sub-optimal for the other methods of signal detection
 
 
 ```{R, time_to_sig_plot1}
@@ -410,6 +429,10 @@ while the prr allowed earlier detection in the pelvic v all comparison (2012 Q4)
 #| fig.height: 7
 #| fig-cap: "Time when methods reached critical values for signal detection."
 ```
+
+
+Figure 5 explores the information about follow-up that is only available retrospectively that may affect signal detection if not approciximately estimated ahead of time. maxSPRT requires both the expected ratio of controls to cases ($c_t$ to $a_t$ in this case) as data is accumulated as well as the expected number of reports per quarter (for a finite follow up period). Figure 5 shows how the time-to signal is alterd with changing assumed values that affect the CV thresholds for significance.
+
 
 
 
