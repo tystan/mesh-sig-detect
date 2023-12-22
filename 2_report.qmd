@@ -3,14 +3,14 @@ title: "Report"
 subtitle: "Signal detection of spontaneous medical device reports over time accounting for multiple comparisons"
 author: "Ty Stanford, Lan Kelly, Marianne Gillam, et al."
 format:
-  pdf:
-    toc: true
-    highlight-style: atom-one
-    number-sections: true
   docx:
     toc: true
     highlight-style: atom-one
     number-sections: true 
+  pdf:
+    toc: true
+    highlight-style: atom-one
+    number-sections: true
 editor: source
 ---
 
@@ -392,7 +392,7 @@ The columns of Figure 2 depict increasing pain topic thresholds. Within each thr
 
 
 
-
+\clearpage
 
 
 ```{R, stat_over_time_plot2}
@@ -416,6 +416,10 @@ Significance is reached in all methods when hernia mesh is the target. However t
 ```
 
 
+
+\clearpage
+
+
 Figure 4 shows how the different signal detection methods reached significance at different pain thresholds $p_t$. The highest thresholds risk delayed signal detection or not reaching significance at all, especially in the least data rich comparison of pelvic mesh v hernia mesh.
 
 xxx where the thresholds that ensured all methods for the mesh only comparisons were detected prior to 2015
@@ -430,6 +434,8 @@ while the PRR allowed earlier potential signal detection in the pelvic mesh vs p
 #| fig-cap: "Time when methods reached critical values for signal detection."
 ```
 
+
+\clearpage
 
 Figure 5 explores the information about follow-up that is only available retrospectively that may affect signal detection if not approciximately estimated ahead of time. maxSPRT requires both the expected ratio of controls to cases ($c_t$ to $a_t$ in this case) as data is accumulated as well as the expected number of reports per quarter (for a finite follow up period). Figure 5 shows how the time-to signal is alterd with changing assumed values that affect the CV thresholds for significance.
 
