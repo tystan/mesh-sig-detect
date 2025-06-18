@@ -210,6 +210,11 @@ ggsave(
   filename = "fig/time_to_signal_method_facets.png", 
   dpi = 900, width = 9, height = 9
 )
+ggsave(
+  filename = "fig/time_to_signal_method_facets.pdf", 
+  device = cairo_pdf, # embed fonts
+  width = 9, height = 9, units = "in"
+)
 
 
 

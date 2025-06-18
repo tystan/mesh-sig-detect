@@ -216,6 +216,12 @@ clean_data %>%
 
 
 ggsave(filename = "fig/pain_topic_dist.png", dpi = 900, width = 7, height = 4)
+ggsave(
+  filename = "fig/pain_topic_dist.pdf", 
+  device = cairo_pdf,  # embed fonts, thanks to 
+  # https://www.andrewheiss.com/blog/2017/09/27/working-with-r-cairo-graphics-custom-fonts-and-ggplot/
+  width = 7, height = 4, units = "in"
+)
 
 
 # ---- create_analysis_data ----
