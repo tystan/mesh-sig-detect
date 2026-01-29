@@ -89,6 +89,12 @@ arbitrary_cell_min <- 1
 
 # ---- funcs ----
 
+### Note in our notation:
+# nA == (target exposure, case) count
+# nB == (target exposure, control) count
+# nC == (comparator exposure, case) count
+# nD == (comparator exposure, control) count
+
 
 # do 90% CI only with lower == one sided 0.05
 get_sig_tab <- function(nA, nB, nC, nD, alpha = 0.10, method = "bcpnn", n_mcmc = 1e+05) { 
