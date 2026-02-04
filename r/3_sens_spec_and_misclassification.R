@@ -26,11 +26,18 @@ library("lubridate")
 library("furrr")
 library("ggplot2")
 library("ggthemes")
+library("ggpubr")
 
 
 
 
 # ---- func ----
+
+# here are the functions written for these analyses
+# they will be shown in the *Appendix A*
+source("r/_funcs.R")
+
+
 
 ### get_sens_spec():
 # create table of ("sens", "spec", "ppv", "npv") from data.frame containing
@@ -198,6 +205,110 @@ int_matrix_to_named_vec <- function(mat) {
 int_matrix_to_named_vec(test_mat_1)
 (test_mat_2 <- matrix(1:4, 2, dimnames = list(1:2, NULL)))
 int_matrix_to_named_vec(test_mat_2)
+
+
+
+## ---- disproporp_funcs ----
+
+### Note in our notation:
+# nA == (target exposure, case) count
+# nB == (target exposure, control) count
+# nC == (comparator exposure, case) count
+# nD == (comparator exposure, control) count
+
+
+# do 90% CI only with lower == one sided 0.05
+get_sig_tab <- function(nA, nB, nC, nD, alpha = 0.10, method = "bcpnn", n_mcmc = 1e+05) { 
+  
+  out_cols_of_interest <- c("est_name", "est_scale", "est", "alpha", "ci_lo") # "ci_hi" (only care about lwr)
+  sig_tab <- NULL # initialise in scope
+  if (method == "bcpnn") {
+    sig_tab <- pharmsignal::bcpnn_mcmc_signal(nA, nB, nC, nD, alpha = alpha, n_mcmc = n_mcmc)
+  } else if (method == "prr") {
+    sig_tab <- pharmsignal::prr_signal(nA, nB, nC, nD, alpha = alpha)
+  } else {
+    stop("method for calcaultions unknown")
+  }
+  sig_tab <- sig_tab[, out_cols_of_interest]
+  # sig_tab <- bind_cols(tibble(mnth = mnth), sig_tab)
+  return(sig_tab)
+  
+}
+
+get_sig_tab_over_time <- function(dat, alpha = 0.10, method = "bcpnn", n_mcmc = 1e+05) {
+  
+  n_tp <- nrow(dat)
+  
+  sig_tab_over_time <-
+    foreach(i = 1:n_tp, .combine = bind_rows, .packages = "dplyr") %do% {
+      with(
+        dat, 
+        get_sig_tab(
+          # mnth[i], 
+          nA[i], nB[i], nC[i], nD[i], 
+          alpha = alpha, method = method, n_mcmc = n_mcmc
+        )
+      )
+    }
+  
+  return(sig_tab_over_time)
+  
+}
+
+
+
+# if it's multiple comparisons central need to sparing use alpha
+get_mult_compare_adj_alpha <- function(dat, alpha = 0.1) {
+  
+  n_reports <- nrow(dat)
+  
+  information_fracs <- (1:n_reports) / n_reports
+  
+  ### alternatives:
+  # spend_obj <- sfLDPocock(alpha = alpha, t = information_fracs, param = NULL)
+  # spend_obj <- sfLDOF(alpha = alpha, t = information_fracs, param = NULL)
+  spend_obj <- sfExponential(alpha = alpha, t = information_fracs, param = 0.5)
+  
+  # plot(1:n_reports, spend_obj$spend, main = "alpha spending func", xlab = "look")
+  
+  return(bind_cols(dat, adj_alpha = spend_obj$spend))
+  
+}
+
+
+# same as get_sig_tab_over_time(), however, alpha assumed included as column in data
+get_sig_tab_over_time_2 <- function(dat, method = "bcpnn", n_mcmc = 1e+05) {
+  
+  n_tp <- nrow(dat)
+  
+  sig_tab_over_time <-
+    foreach(i = 1:n_tp, .combine = bind_rows, .packages = "dplyr") %do% {
+      with(
+        dat, 
+        get_sig_tab(
+          # mnth[i], 
+          nA[i], nB[i], nC[i], nD[i], 
+          alpha = adj_alpha[i], 
+          method = method,
+          n_mcmc = n_mcmc
+        )
+      )
+    }
+  
+  return(sig_tab_over_time)
+  
+}
+
+# test 
+data.frame(nA = 30, nB = 5512, nC = 41, nD = 17445, adj_alpha = 0.1) %>%
+  get_sig_tab_over_time_2(.)
+data.frame(nA = 30, nB = 5512, nC = 41, nD = 17445, adj_alpha = 0.1) %>%
+  get_sig_tab_over_time_2(., method = "prr")
+2 ^ c(0.432304, 0.7942907) # similar to prr on ratio scale
+log2(c(1.556277, 2.308667)) # similar to bcpnn on log2 scale
+
+
+
 
 # ---- import_truth_data ----
 
@@ -392,7 +503,7 @@ roc_dat %>%
 
 
 
-# ---- misclassification_effects  ----
+# ---- misclassification_effects ----
 
 ### see:
 # https://cran.r-project.org/web/packages/episensr/vignettes/episensr.html#misclassification-bias
@@ -435,6 +546,137 @@ test_cumul_qtrly_dat %>% filter(row_number() == n())
     nrow = 2
   ))
 
+
+thresh_pain_df %>% 
+  dplyr::filter(thresh %in% sprintf("%0.3f", 0.05), param %in% c("sens", "spec")) %>% 
+  arrange(type, param, desc(thresh)) %>% 
+  select(type, param, thresh, everything()) %>% 
+  knitr::kable(., digits = 2)
+
+### trying to replicate this approximately
+  # |type        |param |thresh | cases| correct|  est|   lo|   up|
+  # |:-----------|:-----|:------|-----:|-------:|----:|----:|----:|
+  # |pelvic_mesh |sens  |0.050  |    70|      70| 1.00| 0.95| 1.00|
+  # |pelvic_mesh |spec  |0.050  |    32|      25| 0.78| 0.61| 0.89|
+  # |other_mesh  |sens  |0.050  |    31|      28| 0.90| 0.75| 0.97|
+  # |other_mesh  |spec  |0.050  |    53|      44| 0.83| 0.71| 0.91|
+
+misclass_pain_ex <-
+  misclass(
+    pain_ex,
+    type = "outcome",
+    ### Note when type = "outcome", the bias params are:
+    # index_1 = Sensitivity of outcome classification among those with the exposure
+    # index_2 = Sensitivity of outcome classification among those without the exposure
+    # index_3 = Specificity of outcome classification among those with the exposure
+    # index_4 = Specificity of outcome classification among those without the exposure
+    bias_parms = c(0.99, 0.90, 0.78, 0.83)
+  )
+
+misclass_pain_ex
+
+
+
+# note the mode of beta dist is (a - 1) / (a + b - 2)
+# also the larger a + b the smaller the variance
+
+par(mfrow = c(2, 2))
+hist(rbeta(1e+5, 100, 1), main = "pelvic_mesh | sens", xlim = 0:1) # pelvic_mesh |sens| 1.00| 0.95| 1.00|
+hist(rbeta(1e+5, 60, 16), main = "pelvic_mesh | spec", xlim = 0:1) # pelvic_mesh |spec| 0.78| 0.61| 0.89|
+hist(rbeta(1e+5, 81, 9), main = "other_mesh | sens", xlim = 0:1) # other_mesh |sens| 0.90| 0.75| 0.97|
+hist(rbeta(1e+5, 100, 21), main = "other_mesh | spec", xlim = 0:1) # other_mesh |spec| 0.83| 0.71| 0.91|
+par(mfrow = c(1, 1))
+
+set.seed(123)
+probsens_pain_ex <- 
+  probsens(
+    pain_ex,
+    type = "outcome",
+    reps = 1e+5,
+    # The sensitivity of outcome classification among those with the exposure
+    seca = list("beta", c(100, 1)),
+    # The specificity of outcome classification among those with the exposure
+    spca = list("beta", c(60, 16)),
+    # The sensitivity of outcome classification among those without the exposure
+    seexp = list("beta", c(81, 9)),
+    # The specificity of outcome classification among those without the exposure
+    spexp = list("beta", c(100, 21)),
+    corr_se = 0.25, # Correlations should be > 0 and < 1 (BUT more than ~0.3 brings errors [infeasibility])
+    corr_sp = 0.25  # [from testing these values almost make no difference]
+  )
+
+### testing: using uniform distribution with small domain ~= point estimates. 
+### I think that's clever anyway:-)
+# set.seed(123)
+# probsens_pain_ex <- 
+#   probsens(
+#     pain_ex,
+#     type = "outcome",
+#     reps = 1e5,
+#     # The sensitivity of outcome classification among those with the exposure
+#     seca = list("uniform", c(0.99)+ c(-0.01, 0.005)),
+#     # The specificity of outcome classification among those with the exposure
+#     spca = list("uniform", c(0.78) + c(-0.01, 0.01)),
+#     # The sensitivity of outcome classification among those without the exposure
+#     seexp = list("uniform", c(0.82)+ c(-0.01, 0.01)),
+#     # The specificity of outcome classification among those without the exposure
+#     spexp = list("uniform", c(0.90) + c(-0.01, 0.01)),
+#     corr_se = 0.25,
+#     corr_sp = 0.25
+#   )
+
+brk_inc <- 0.02
+first_lab <- 0.1
+breaks_0_1 <- seq(0 - brk_inc, 1 + brk_inc, brk_inc)
+labels_0_1 <- breaks_0_1
+labels_0_1[-seq(1 + 1, length(labels_0_1) - 1, round(first_lab / brk_inc))] <- ""
+
+add_plt_extras <- function(plt_obj, which_param = 1, rm_dens_geom = TRUE) {
+  if (rm_dens_geom) {
+    plt_obj$layers[["geom_density"]] <- NULL
+  }
+  labs_vec <- 
+    as.character(
+      outer(
+        c("Exposed", "Not exposed"), 
+        c("Sensitivity", "Specificity"), 
+        FUN = \(x, y) str_c(y, x, sep = " of ")
+      )
+    )
+  plt_obj +
+    scale_x_continuous(
+      limits = c(-0.01, 1.01), 
+      breaks = breaks_0_1, 
+      labels = labels_0_1
+    ) +
+    labs(x = labs_vec[which_param], y = "Density of simulations") +
+    theme_classic()
+}
+
+p_sens_exp <- plot(probsens_pain_ex, parms = "seca") %>% add_plt_extras(., 1)
+p_spec_exp <-plot(probsens_pain_ex, parms = "spca") %>% add_plt_extras(., 2)
+p_sens_nonexp <- plot(probsens_pain_ex, parms = "seexp") %>% add_plt_extras(., 3)
+p_spec_nonexp <- plot(probsens_pain_ex, parms = "spexp") %>% add_plt_extras(., 4)
+
+ggarrange(p_sens_exp, p_sens_nonexp, p_spec_exp, p_spec_nonexp, nrow = 2, ncol = 2)
+
+
+probsens_pain_ex
+
+# str(misclass_pain_ex$adj_measures)
+### this is the original simple and analytical calculatiopns for misclassification
+misclass_pain_ex$adj_measures["   Misclassification Bias Corrected Odds Ratio:", " "]
+### compare to more complex beta priors (same median estimates roughly so working well)
+### NB: the beta priors will induce more variability than the simple approach to REALLY "kick the tyres"
+###     of the time-to-disproportionate-significance
+median(probsens_pain_ex$sim_df$syst_OR) # very similar to the simple misclass analysis
+median(probsens_pain_ex$sim_df$tot_OR)  # very similar to the simple misclass analysis too
+
+
+
+# ---- example_induced_misclassification_effects_to_real_data ----
+
+# re-use pain example from above
 pain_ex
 (vec_pain_ex <- int_matrix_to_named_vec(pain_ex))
 
@@ -446,58 +688,19 @@ sim_cumul_qtrly_dat <- test_cumul_qtrly_dat
 (real_seq_c <- get_seq_cnts_from_cumul(test_cumul_qtrly_dat$nC))
 (real_seq_d <- get_seq_cnts_from_cumul(test_cumul_qtrly_dat$nD))
 
+### checks
 seq_tots <- c(sum(real_seq_a), sum(real_seq_b), sum(real_seq_c), sum(real_seq_d))
 names(seq_tots) <- names(vec_pain_ex)
 seq_tots
 expect_equal(seq_tots, vec_pain_ex)
 
-
-misclass_pain_ex <-
-  misclass(
-    pain_ex,
-    type = "outcome",
-    ### Note when type = "outcome", the bias params are:
-    # index_1 = Sensitivity of outcome classification among those with the exposure
-    # index_2 = Sensitivity of outcome classification among those without the exposure
-    # index_3 = Specificity of outcome classification among those with the exposure
-    # index_4 = Specificity of outcome classification among those without the exposure
-    bias_parms = c(0.99, 0.82, 0.78, 0.90)
-  )
-
-misclass_pain_ex
-
-set.seed(123)
-probsens_pain_ex <- 
-  probsens(
-    pain_ex,
-    type = "outcome",
-    reps = 1e5,
-    # The sensitivity of outcome classification among those with the exposure
-    seca = list("uniform", c(0.99)+ c(-0.01, 0.005)),
-    # The sensitivity of outcome classification among those without the exposure
-    seexp = list("uniform", c(0.82)+ c(-0.01, 0.01)),
-    # The specificity of outcome classification among those with the exposure
-    spca = list("uniform", c(0.78) + c(-0.01, 0.01)),
-    # The specificity of outcome classification among those without the exposure
-    spexp = list("uniform", c(0.90) + c(-0.01, 0.01)),
-    corr_se = 0.2,
-    corr_sp = 0.2
-  )
-
-probsens_pain_ex
-# compare to analytical
-# str(misclass_pain_ex$adj_measures)
-misclass_pain_ex$adj_measures["   Misclassification Bias Corrected Odds Ratio:", " "]
-median(probsens_pain_ex$sim_df$syst_OR)
-median(probsens_pain_ex$sim_df$tot_OR)
-
-
+### these are the sims to induce on the real example
 tibble(probsens_pain_ex$sim_df)
 sim_2x2 <- 
   probsens_pain_ex$sim_df %>% 
   select(all_of(c("ab", "cb", "bb", "db"))) %>% 
   rename(all_of(c("nA" = "ab", "nB" = "cb", "nC" = "bb", "nD" = "db")))
-tibble(sim_2x2)
+tibble(sim_2x2) # each row a simulation
 
 # check that pelvic exposure (a, b)-tuples from 2x2 table are the same total cases from orig 2x2
 stopifnot(all(sum(pain_ex[, 1]) == rowSums(sim_2x2[, c("nA", "nB")])))
@@ -505,13 +708,29 @@ stopifnot(all(sum(pain_ex[, 1]) == rowSums(sim_2x2[, c("nA", "nB")])))
 stopifnot(all(sum(pain_ex[, 2]) == rowSums(sim_2x2[, c("nC", "nD")])))
 
 # these are sim changes to contingency tabs (R is column-major operations on matrices)
-i <- 5
+i <- 5 # use the fifth sim as more interesting
 str(sim_2x2)
-sim_2x2[i, ] - vec_pain_ex
+sim_2x2[i, ] - vec_pain_ex # these are the simulated changes from the real example
 delta_tab <- t(apply(as.matrix(sim_2x2), 1, \(x) x - vec_pain_ex))
 str(delta_tab)
 stopifnot(all(0 == rowSums(delta_tab)))
 head(delta_tab)
+
+
+# final time estimate for real example 
+example_as_tib <- as_tibble(t(vec_pain_ex)) 
+colnames(example_as_tib) <- str_c("n", LETTERS[1:4])
+example_as_tib
+example_as_tib %>% 
+  mutate(adj_alpha = 0.1) %>%
+  get_sig_tab_over_time_2(.)
+
+# how does the sim version change the final time estimate? 
+### NB much higher estimate/lo_ci as expected with less comparator outcomes
+sim_2x2[i, ] 
+sim_2x2[i, ] %>% 
+  mutate(adj_alpha = 0.1) %>%
+  get_sig_tab_over_time_2(.)
 
 
 (delta_a_i <- delta_tab[i, "nA"])
@@ -519,6 +738,7 @@ head(delta_tab)
 (delta_c_i <- delta_tab[i, "nC"])
 (delta_d_i <- delta_tab[i, "nD"])
 
+### checks logic holds
 stopifnot(delta_a_i + delta_b_i == 0)
 stopifnot(delta_c_i + delta_d_i == 0)
 
@@ -549,24 +769,34 @@ if (delta_c_i < 0) {
   seq_d_i <- pop_vec_lst$vals
 }
 
+### checks again for fun
 c(delta_a_i, delta_b_i, delta_c_i, delta_d_i)
 c(seq_a_i - real_seq_a)
 c(seq_b_i - real_seq_b)
 c(seq_c_i - real_seq_c)
 c(seq_d_i - real_seq_d)
 
-
-
+# re-insert the simulated changes back into data structure
 sim_cumul_qtrly_dat$nA <- cumsum(seq_a_i)
 sim_cumul_qtrly_dat$nB <- cumsum(seq_b_i)
 sim_cumul_qtrly_dat$nC <- cumsum(seq_c_i)
 sim_cumul_qtrly_dat$nD <- cumsum(seq_d_i)
-
-
+# label the simulation too
 sim_cumul_qtrly_dat$sim_i <- as.integer(i)
 
+### test analysis
+sim_cumul_qtrly_dat %>% 
+  mutate(adj_alpha = 0.1) %>%
+  get_sig_tab_over_time_2(.)
+
+# final time estimate for real example the same? (YES!!!)
+example_as_tib %>% 
+  mutate(adj_alpha = 0.1) %>%
+  get_sig_tab_over_time_2(.)
 
 
+
+# ---- funcs_for_induced_misclassification_effects_to_real_data ----
 
 
 
@@ -665,118 +895,22 @@ perturb_real_by_misclass_sim <- function(real_df, sim_deltas_df) {
 
 }
 
+### use a subset of sims because of computational limitations at the mo
+# (and seems not to linearly scale currently)
+sub_sim <- 1e+3
+
 # takes a minute or so to get through 10k == 1e+4 simulations
 tic()
 sim_cumul_qtrly_dat <-
   perturb_real_by_misclass_sim(
     real_df = test_cumul_qtrly_dat, 
-    sim_deltas_df = delta_tab[1:1e+3, , drop = FALSE] ### testing starting small
+    sim_deltas_df = delta_tab[1:sub_sim, , drop = FALSE] 
     # sim_deltas_df = delta_tab
   )
 toc()
 
 
 # table(pull(distinct(sim_cumul_qtrly_dat, sim_i)) %in% 1:1e+4, useNA = "ifany")
-
-
-## ---- disproporp_funcs ----
-
-### Note in our notation:
-# nA == (target exposure, case) count
-# nB == (target exposure, control) count
-# nC == (comparator exposure, case) count
-# nD == (comparator exposure, control) count
-
-
-# do 90% CI only with lower == one sided 0.05
-get_sig_tab <- function(nA, nB, nC, nD, alpha = 0.10, method = "bcpnn", n_mcmc = 1e+05) { 
-  
-  out_cols_of_interest <- c("est_name", "est_scale", "est", "alpha", "ci_lo") # "ci_hi" (only care about lwr)
-  sig_tab <- NULL # initialise in scope
-  if (method == "bcpnn") {
-    sig_tab <- pharmsignal::bcpnn_mcmc_signal(nA, nB, nC, nD, alpha = alpha, n_mcmc = n_mcmc)
-  } else if (method == "prr") {
-    sig_tab <- pharmsignal::prr_signal(nA, nB, nC, nD, alpha = alpha)
-  } else {
-    stop("method for calcaultions unknown")
-  }
-  sig_tab <- sig_tab[, out_cols_of_interest]
-  # sig_tab <- bind_cols(tibble(mnth = mnth), sig_tab)
-  return(sig_tab)
-  
-}
-
-get_sig_tab_over_time <- function(dat, alpha = 0.10, method = "bcpnn", n_mcmc = 1e+05) {
-  
-  n_tp <- nrow(dat)
-  
-  sig_tab_over_time <-
-    foreach(i = 1:n_tp, .combine = bind_rows, .packages = "dplyr") %do% {
-      with(
-        dat, 
-        get_sig_tab(
-          # mnth[i], 
-          nA[i], nB[i], nC[i], nD[i], 
-          alpha = alpha, method = method, n_mcmc = n_mcmc
-        )
-      )
-    }
-  
-  return(sig_tab_over_time)
-  
-}
-
-
-
-# if it's multiple comparisons central need to sparing use alpha
-get_mult_compare_adj_alpha <- function(dat, alpha = 0.1) {
-  
-  n_reports <- nrow(dat)
-  
-  information_fracs <- (1:n_reports) / n_reports
-  
-  ### alternatives:
-  # spend_obj <- sfLDPocock(alpha = alpha, t = information_fracs, param = NULL)
-  # spend_obj <- sfLDOF(alpha = alpha, t = information_fracs, param = NULL)
-  spend_obj <- sfExponential(alpha = alpha, t = information_fracs, param = 0.5)
-  
-  # plot(1:n_reports, spend_obj$spend, main = "alpha spending func", xlab = "look")
-  
-  return(bind_cols(dat, adj_alpha = spend_obj$spend))
-  
-}
-
-
-# same as get_sig_tab_over_time(), however, alpha assumed included as column in data
-get_sig_tab_over_time_2 <- function(dat, method = "bcpnn", n_mcmc = 1e+05) {
-  
-  n_tp <- nrow(dat)
-  
-  sig_tab_over_time <-
-    foreach(i = 1:n_tp, .combine = bind_rows, .packages = "dplyr") %do% {
-      with(
-        dat, 
-        get_sig_tab(
-          # mnth[i], 
-          nA[i], nB[i], nC[i], nD[i], 
-          alpha = adj_alpha[i], 
-          method = method,
-          n_mcmc = n_mcmc
-        )
-      )
-    }
-  
-  return(sig_tab_over_time)
-  
-}
-
-# test 
-data.frame(nA = 30, nB = 5512, nC = 41, nD = 17445, adj_alpha = 0.1) %>%
-  get_sig_tab_over_time_2(.)
-data.frame(nA = 30, nB = 5512, nC = 41, nD = 17445, adj_alpha = 0.1) %>%
-  get_sig_tab_over_time_2(., method = "prr")
-2 ^ c(0.432304, 0.7942907) # similar to prr on ratio scale
-log2(c(1.556277, 2.308667)) # similar to bcpnn on log2 scale
 
 
 
@@ -818,101 +952,6 @@ toc()
 
 
 
-## ---- bcpnn_calcs ----
-
-
-
-
-sra_cum <- sim_cumul_qtrly_dat
-
-# make data for each combination of params nested for purrr like processing
-sra_cum <-
-  sra_cum %>%
-  nest(data = c(mnth, nA, nB, nC, nD))
-
-
-
-# testing/example
-sra_cum$data[[5]] %>% print(., n = nrow(.))
-get_sig_tab_over_time(sra_cum$data[[5]])
-
-
-
-### for 1k sims with r9-5900X/128GB 2133mhz memory 
-# takes ~ 90 sec [22 threads @ 4.4Ghz and 145W power draw]
-tic()
-sra_cum <-
-  sra_cum %>%
-  mutate(
-    sig_tab = 
-      future_map(
-        .x = data, 
-        .f = get_sig_tab_over_time,
-        .options = furrr_seed1
-      )
-  )
-toc()
-
-# check
-sra_cum$sig_tab[[5]]
-
-
-sra_cum_bcpnn <-
-  sra_cum %>%
-  unnest(cols = c(data, sig_tab)) %>%
-  mutate(
-    # dte = as_date(paste0(mnth, "-01"))
-    dte = 
-      as_date(paste0(
-        substr(mnth, 1, 5),
-        sprintf("%02.0f", (as.integer(substr(mnth, 7, 7)) - 1) * 3 + 1),
-        "-01"
-      ))
-  )
-
-sra_cum_bcpnn
-
-
-# first signif
-bcpnn_signif <-
-  sra_cum_bcpnn %>%
-  group_by(grps, dat_type, thresh, sim_i) %>%
-  dplyr::filter(ci_lo > 0) %>%
-  arrange(dte) %>%
-  dplyr::filter(row_number() == 1) %>%
-  ungroup() %>%
-  rename(dte_reach_sig = dte)
-
-
-nrow(sra_cum_bcpnn)
-sra_cum_bcpnn <-
-  left_join(
-    sra_cum_bcpnn,
-    bcpnn_signif %>% select(grps, dat_type, thresh, sim_i, dte_reach_sig),
-    c("grps", "dat_type", "thresh", "sim_i")
-  )
-nrow(sra_cum_bcpnn)
-
-sra_cum_bcpnn
-
-
-sra_cum_bcpnn <- 
-  sra_cum_bcpnn %>%
-  mutate(
-    dte_reach_sig = if_else(is.na(dte_reach_sig), as_date(today()), dte_reach_sig),
-    reach_sig = dte >= dte_reach_sig
-  )
-
-
-
-## ---- save1 ----
-
-
-sra_cum_bcpnn %>%
-  write_parquet(., sink = "out/sra_cum_bcpnn_sim.parquet")
-
-
-
 
 ## ---- multcompar_bcpnn ----
 
@@ -948,9 +987,8 @@ toc()
 # test
 sra_cum$data[[11]] # check adj_alpha added as column in data
 
-### takes ~ 40 sec (i5-8400 6c/6t)
-### takes ~ 55 sec on laptop (i5 8th gen 4c/8t)
-### takes ~ 10 sec (R9-5900X 12c/24t)
+### for 1k sims with r9-5900X/128GB 2133mhz memory 
+# takes ~ 90 sec [22 threads @ 4.4Ghz and 145W power draw]
 tic()
 sra_cum <-
   sra_cum %>%
@@ -1025,7 +1063,7 @@ sra_cum_bcpnn_mc_adj <-
 
 
 
-## ---- save2 ----
+## ---- save_bcpnn_sim_mc ----
 
 
 sra_cum_bcpnn_mc_adj %>%
@@ -1033,222 +1071,498 @@ sra_cum_bcpnn_mc_adj %>%
 
 
 
-## ---- plot_sim ----
 
 
-# sra_cum_prr_sim_mc_adj <-  read_parquet("out/sra_cum_prr_sim_mc_adj.parquet")
-sra_cum_bcpnn_sim_mc_adj <-  read_parquet("out/sra_cum_bcpnn_sim_mc_adj.parquet")
-# sra_cum_maxsprt_sim <-  read_parquet("out/sra_cum_maxsprt_sim.parquet")
 
 
-sra <-
-  bind_rows(
-    sra_cum_bcpnn_sim_mc_adj %>% mutate(stat = "BCPNN (MCadj)"),
-    # sra_cum_prr_mc_adj %>% mutate(stat = "PRR (MCadj)"),
-    # sra_cum_maxsprt %>% mutate(stat = "maxSPRT")
-  ) %>%
-  mutate(stat = fct_inorder(stat)) %>%
-  select(stat, everything())
-
-# sra %>%
-#   dplyr::filter(stat == "BCPNN (MCadj)")
+# ---- multcompar_prr ----
 
 
-sra <-
-  sra %>%
+sra_cum <- sim_cumul_qtrly_dat
+
+
+
+sra_cum <-
+  sra_cum %>%
+  nest(data = c(mnth, nA, nB, nC, nD))
+
+
+
+# test
+get_mult_compare_adj_alpha(sra_cum$data[[11]])
+get_sig_tab_over_time_2(get_mult_compare_adj_alpha(sra_cum$data[[11]]))
+get_sig_tab_over_time_2(get_mult_compare_adj_alpha(sra_cum$data[[11]]), method = "prr")
+get_sig_tab_over_time(sra_cum$data[[11]], method = "prr")
+
+tic()
+sra_cum <-
+  sra_cum %>%
   mutate(
-    test_stat = 
-      case_when(
-        # stat == "maxSPRT"     ~ maxllr, 
-        # stat == "PRR (MCadj)" ~ ci_lo, 
-        stat == "BCPNN (MCadj)" ~ ci_lo
-      ),
-    test_thresh = 
-      case_when(
-        # stat == "maxSPRT"     ~ cv, 
-        # stat == "PRR (MCadj)" ~ 1, 
-        stat == "BCPNN (MCadj)" ~ 0
-      ),
-    rr_stat = 
-      case_when(
-        # stat == "maxSPRT"     ~ rre, 
-        # stat == "PRR (MCadj)" ~ est, 
-        stat == "BCPNN (MCadj)" ~ 2 ^ est
+    data = 
+      map(
+        .x = data, 
+        .f = get_mult_compare_adj_alpha
       )
   )
+toc()
+
+# test
+sra_cum$data[[11]] # check adj_alpha added as column in data
+
+get_sig_tab_over_time_2_prr <- function(dat) {
+  get_sig_tab_over_time_2(dat, method = "prr")
+}
 
 
-
-
-# thresholds <- sort(unique(sra[["thresh"]]))
-# length(thresholds)
-
-
-
-
-
-plt_dat <-
-  bind_rows(
-    sra_cum_bcpnn_mc_adj %>% 
-      mutate(
-        cv = 0, 
-        stat = "IC (BCPNN, Lower 95% CI)"
-      ) %>%
-      select(stat, grps, thresh, sim_i, dte, cv, val = ci_lo, reach_sig, dte_reach_sig) # ,
-    # sra_cum_prr_mc_adj %>% 
-    #   mutate(
-    #     cv = 1, 
-    #     stat = "RR (PRR, Lower 95% CI)"
-    #   ) %>%
-    #   select(stat, grps, thresh, sim_i, dte, cv, val = ci_lo, reach_sig, dte_reach_sig),
-    # sra_cum_maxsprt %>%
-    #   mutate(stat = "MaxSPRT (max LLR)") %>%
-    #   select(stat, grps, thresh, sim_i, dte, cv, val = maxllr, reach_sig, dte_reach_sig)
-  ) 
-
-
-sig_reach_dat <-
-  plt_dat %>%
-  arrange(stat, grps, thresh, sim_i, dte) %>%
-  group_by(stat, grps, thresh, sim_i) %>%
-  dplyr::filter(reach_sig == 1) %>%
-  dplyr::filter(row_number() == 1) %>%
-  select(stat, grps, thresh, sim_i, dte_reached = dte) %>%
-  # now create separation between reached CV values when it occurs
-  group_by(stat, thresh, sim_i, dte_reached) %>%
-  mutate(rep_dte = 1:n()) %>%
-  ungroup() %>%
-  mutate(dte_reached = dte_reached + days(10 * (rep_dte - 1))) %>%
-  select(-rep_dte)
-
-
-
-
-
-plt_dat <-
-  left_join(
-    plt_dat,
-    sig_reach_dat,
-    c("stat", "grps", "thresh", "sim_i")
-  ) # 
-
-plt_dat %>%
- dplyr::filter(dte_reach_sig != dte_reached)
-
-
-plt_dat <-
-  plt_dat %>%
+### takes ~5 sec 
+tic()
+sra_cum <-
+  sra_cum %>%
   mutate(
-    stat = fct_inorder(stat)
+    sig_tab = 
+      future_map(
+        .x = data, 
+        .f = get_sig_tab_over_time_2_prr, # the alpha in data version
+        .options = furrr_seed1
+      )
+  )
+toc()
+
+
+
+# check
+sra_cum$sig_tab[[1]]
+
+
+sra_cum_prr_mc_adj <-
+  sra_cum %>%
+  unnest(cols = c(data, sig_tab)) %>%
+  mutate(
+    # dte = as_date(paste0(mnth, "-01"))
+    dte = 
+      as_date(paste0(
+        substr(mnth, 1, 5),
+        sprintf("%02.0f", (as.integer(substr(mnth, 7, 7)) - 1) * 3 + 1),
+        "-01"
+      ))
   )
 
-
-# plt_dat %>%
-#   dplyr::filter(thresh == "0.050", grepl("(c)", grps, fixed = TRUE))
+sra_cum_prr_mc_adj
 
 
+# deal with warnings about 0 counts that affects ests and CIs
+sra_cum_prr_mc_adj <-
+  sra_cum_prr_mc_adj %>%
+  mutate(
+    est = if_else(!is.finite(est), as.numeric(1), est),
+    ci_lo = if_else(!is.finite(ci_lo), -Inf, ci_lo),
+  )
+
+sra_cum_prr_mc_adj
+
+with(sra_cum_prr_mc_adj, table(dte, mnth, useNA = "ifany")) %>% 
+  as.data.frame() %>%
+  dplyr::filter(Freq > 0) %>%
+  arrange(mnth, dte)
 
 
-# ---- time_to_sig_plot1 ----
-
-
-col_pal <- c("darkorange", "cyan4", "purple")
-
-
-date_signif_dat <-
-  sra %>%
-  group_by(stat, grps, dat_type, thresh, sim_i) %>%
+# first signif
+prr_mc_adj_signif <-
+  sra_cum_prr_mc_adj %>%
+  group_by(grps, dat_type, thresh, sim_i) %>%
+  dplyr::filter(ci_lo > 1) %>% # 1 is the critical value on ratio scale
   arrange(dte) %>%
-  dplyr::filter(reach_sig) %>%
   dplyr::filter(row_number() == 1) %>%
   ungroup() %>%
-  arrange(stat, grps, dat_type, thresh, sim_i) 
+  rename(dte_reach_sig = dte)
 
 
-signif_plt <-
-  date_signif_dat %>%
-  ### only keep pelvic mesh as target vs whatever comparator
-  dplyr::filter(grepl("^.*pelvic.* v ", grps)) %>%
+nrow(sra_cum_prr_mc_adj)
+sra_cum_prr_mc_adj <-
+  left_join(
+    sra_cum_prr_mc_adj,
+    prr_mc_adj_signif %>% select(grps, dat_type, thresh, sim_i, dte_reach_sig),
+    c("grps", "dat_type", "thresh", "sim_i")
+  )
+nrow(sra_cum_prr_mc_adj)
+
+sra_cum_prr_mc_adj
+
+
+sra_cum_prr_mc_adj %>%
+  arrange(grps, thresh, dte, mnth) %>%
+  group_by(grps, thresh, dte, mnth) %>%
+  summarise(n = n()) %>%
+  ungroup() %>%
+  dplyr::filter(n > 1)
+
+sra_cum_prr_mc_adj %>%
+  dplyr::filter(thresh == "0.050", grepl("(b)", grps, fixed = TRUE))
+
+
+# sra_cum_prr_mc_adj %>%
+#   dplyr::filter(thresh == "0.050", grepl("(b)", grps, fixed = TRUE)) %>%
+#   print(., n = nrow(.))
+
+sra_cum_prr_mc_adj <- 
+  sra_cum_prr_mc_adj %>%
   mutate(
-    grps = gsub("\\([a-z]\\) ", "", grps),
-    grps = gsub("_", " ", grps),
-    grps = gsub("pelvic mesh", "Pelvic mesh", grps),
-    grps = gsub("hernia mesh", "Hernia mesh", grps),
-    # grps = str_to_sentence(grps),
-    grps = gsub(" v ", "\nv\n", grps, fixed = TRUE),
-    grps = fct_inorder(grps)
-    # stat = fct_inorder(stat)
+    dte_reach_sig = if_else(is.na(dte_reach_sig), as_date(today()), dte_reach_sig),
+    reach_sig = dte >= dte_reach_sig
+  )
+
+
+
+
+
+# ---- save_prr_mc ----
+
+
+sra_cum_prr_mc_adj %>%
+  write_parquet(., sink = "out/sra_cum_prr_sim_mc_adj.parquet")
+
+
+
+
+
+# ---- maxsprt ----
+
+
+sra_cum <- sim_cumul_qtrly_dat
+
+
+cv_tab <-
+  sra_cum %>%
+  dplyr::filter(sim_i == 1) %>%
+  group_by(grps, thresh) %>%
+  summarise(
+    min_dte = min(mnth),
+    max_dte = max(mnth),
+    rows = n(),
+    sum_nA = max(nA),
+    sum_nC = max(nC),
+    tot_n = sum_nA + sum_nC,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    # qtrs = interval(paste0(min_dte, "-01"), paste0(max_dte, "-01")) / months(1) / 4,
+    qtrs = rows,
+    n_per_qtr = tot_n / qtrs,
+    z = sum_nC / sum_nA
   ) 
 
+cv_tab %>%
+  knitr::kable(., digits = 1)
 
 
-# levels(signif_plt$grps)
+# maxsprt: create alternative CV tab 
 
-signif_plt %>%
-  arrange(grps, thresh) %>%
-  ggplot(., aes(x = dte_reach_sig, fill = stat)) +
-  geom_bar(alpha = 0.8, col = NA) +
-  # geom_path(aes(group = interaction(stat, sim_i))) +
-  scale_fill_manual(values = col_pal) +
-  # scale_colour_tableau(palette = "Color Blind", direction = -1) +
-  geom_vline(xintercept = quantile(signif_plt$dte_reach_sig, c(0.01, 0.5, 0.99), type = 3)) +
-  facet_grid(stat ~ grps) +
-  # facet_wrap( ~ grps, ncol = 1) +
-  theme_bw() +
-  theme(text = element_text(family = "serif")) +
-  labs(
-    x = expression("Date" ~ H[0] ~ "rejected (null hypothesis of no signal)"),
-    y = "Threshold for P(topic = 'pain' | doc) to be classed a 'pain' adverse event",
-    # col = "Signal detection\nmethod",
-    fill = "Signal detection\nmethod"
+
+
+### create CV tab for alternative n_per_qtr and z ratios
+alt_mults <-
+  tribble(
+    ~alt_str, ~modifier, ~mult,
+    "quar_n", "n_per_qtr", 0.25,
+    "half_n", "n_per_qtr", 0.5,
+    "doub_n", "n_per_qtr", 2  ,
+    "quad_n", "n_per_qtr", 4  ,
+    "quar_z",         "z", 0.25,
+    "half_z",         "z", 0.5,
+    "doub_z",         "z", 2  ,
+    "quad_z",         "z", 4  
   )
 
-# signif_plt %>%
-#   arrange(grps, thresh) %>%
-#   ggplot(., aes(x = dte_reach_sig, y = as.numeric(thresh), col = stat)) +
-#   geom_point(alpha = 0.2) +
-#   # geom_path(aes(group = interaction(stat, sim_i))) +
-#   scale_colour_manual(values = col_pal) +
-#   # scale_colour_tableau(palette = "Color Blind", direction = -1) +
-#   facet_grid(stat ~ grps) +
-#   # facet_wrap( ~ grps, ncol = 1) +
-#   theme_bw() +
-#   theme(text = element_text(family = "serif")) +
-#   labs(
-#     x = expression("Date" ~ H[0] ~ "rejected (null hypothesis of no signal)"),
-#     y = "Threshold for P(topic = 'pain' | doc) to be classed a 'pain' adverse event",
-#     col = "Signal detection\nmethod"
-#   )
 
-# ggsave(
-#   filename = "fig/time_to_signal_method_facets.png", 
-#   dpi = 900, width = 9, height = 9
-# )
-ggsave(
-  filename = "fig/sim_data_time_to_signal_method_facets.pdf",
-  device = cairo_pdf, # embed fonts
-  width = 9, height = 9, units = "in"
-)
-
-
-
-
-
-
-
-
-probsens_pain_ex <- 
-  probsens(
-    pain_ex,
-    type = "exposure",
-    reps = 50000,
-    # mode(beta) = (a - 1) / (a + b - 2)
-    seca = list("beta", c(25, 3)),
-    spca = list("uniform", c(.9, .99))
+cv_tab_alts <-
+  cross_join(
+    alt_mults,
+    cv_tab
+  ) %>%
+  arrange(
+    grps, thresh, modifier, mult, alt_str
   )
-plot(probsens_pain_ex, "seca")
-plot(probsens_pain_ex, "spca")
 
+if (nrow(alt_mults) * nrow(cv_tab) != nrow(cv_tab_alts)) {
+  stop("cross_join() has gone wrong")
+}
+
+
+
+# maxsprt: create CVs 
+
+# testing/example
+row_i <- 1
+cv_tab[row_i, ]
+get_maxsprt_cv(cv_tab$tot_n[row_i], floor(cv_tab$n_per_qtr[row_i]), cv_tab$z[row_i])
+
+
+
+
+# note purrr::possibly() will just catch when model fails and return as.numeric(NA) 
+get_maxsprt_cv_poss <- 
+  possibly(get_maxsprt_cv, otherwise = NA_real_, quiet = FALSE)
+
+tic()
+cv_tab <-
+  cv_tab %>%
+  # dplyr::filter(row_number() < 7) %>% ### testing
+  mutate(
+    cv =
+      future_pmap_dbl(
+        .l = list(tot_n, floor(n_per_qtr), z),
+        .f = ~get_maxsprt_cv_poss(..1, ..2, ..3),
+        .options = furrr_seed3
+      )
+  )
+toc()
+
+cv_tab
+cv_tab %>% dplyr::filter(is.na(cv))
+# remove analyses where thresholds don't allow enough events (extreme threshold values)
+# cv_tab <- cv_tab %>% dplyr::filter(!is.na(cv))
+
+
+
+# maxsprt: create alt CVs 
+
+cv_tab_alts <-
+  cv_tab_alts %>%
+  mutate(
+    n_per_qtr = if_else(modifier == "n_per_qtr", mult * n_per_qtr, n_per_qtr),
+    z         = if_else(modifier ==         "z", mult * z        , z        ),
+  )
+
+cv_tab_alts
+
+
+tic()
+cv_tab_alts <-
+  cv_tab_alts %>%
+  # dplyr::filter(row_number() < 7) %>% ### testing
+  mutate(
+    cv =
+      future_pmap_dbl(
+        .l = list(tot_n, floor(n_per_qtr), z),
+        .f = ~get_maxsprt_cv_poss(..1, ..2, ..3),
+        .options = furrr_seed4
+      )
+  )
+toc()
+
+cv_tab_alts
+cv_tab_alts %>% dplyr::filter(is.na(cv))
+
+
+# include original CVs too
+cv_tab_alts <-
+  bind_rows(
+    cv_tab_alts,
+    cv_tab %>% mutate(alt_str = "same_n", modifier = "n_per_qtr", mult = 1),
+    cv_tab %>% mutate(alt_str = "same_z", modifier = "z", mult = 1)
+  ) %>%
+  arrange(grps, thresh, modifier, mult, alt_str)
+
+
+
+
+# maxsprt: create llr test stats 
+
+
+maxsprt_dat_calcs <-
+  sra_cum %>%
+  mutate(
+    maxllr = max_sprt_stat_(c_n = nA, n = nA + nC, z = (nC + nD) / (nA + nB)),
+    rre = rr_est_(c_n = nA, n = nA + nC, z = (nC + nD) / (nA + nB))
+  )
+
+# maxsprt_dat
+# maxsprt_dat %>% dplyr::filter(thresh == "0.100", substr(grps, 1, 3) == "(a)")
+
+maxsprt_dat <-
+  maxsprt_dat_calcs %>%
+  left_join(
+    .,
+    cv_tab %>% select(grps, thresh, cv),
+    c("grps", "thresh")
+  ) 
+
+maxsprt_dat <-
+  maxsprt_dat %>%
+  mutate(
+    # some cvs don't exist so those llr never reach cv
+    reached_cv = if_else(is.na(cv), 0L, as.integer(maxllr > cv)),
+    # create date for start of each quarter
+    dte = 
+      as_date(paste0(
+        substr(mnth, 1, 5),
+        sprintf("%02.0f", (as.integer(substr(mnth, 7, 7)) - 1) * 3 + 1),
+        "-01"
+      ))
+  )
+
+maxsprt_dat %>% dplyr::filter(is.na(cv))
+
+# have a peak
+maxsprt_dat %>%
+  select(-dat_type) %>%
+  print(., n = 25)
+
+
+# first signif
+maxsprt_signif <-
+  maxsprt_dat %>%
+  group_by(grps, dat_type, thresh, sim_i) %>%
+  dplyr::filter(reached_cv > 0) %>%
+  arrange(dte) %>%
+  dplyr::filter(row_number() == 1) %>%
+  ungroup() %>%
+  rename(dte_reach_sig = dte)
+
+
+nrow(maxsprt_dat)
+maxsprt_dat <-
+  left_join(
+    maxsprt_dat,
+    maxsprt_signif %>% select(grps, dat_type, thresh, sim_i, dte_reach_sig),
+    c("grps", "dat_type", "thresh", "sim_i")
+  )
+nrow(maxsprt_dat)
+
+maxsprt_dat
+
+
+maxsprt_dat <- 
+  maxsprt_dat %>%
+  mutate(
+    dte_reach_sig = if_else(is.na(dte_reach_sig), as_date(today()), dte_reach_sig),
+    reach_sig = dte >= dte_reach_sig
+  )
+
+# these are where the maxllr has dropped under the CV after exceeding it previously
+maxsprt_dat %>%
+  dplyr::filter(
+    is.na(reach_sig) | 
+      is.na(reached_cv) | 
+      (as.logical(reached_cv) != reach_sig)
+  )
+
+
+
+maxsprt_dat <- 
+  maxsprt_dat %>%
+  select(-reached_cv)
+
+
+
+
+# maxsprt: create llr test stats for alt CVs
+
+
+nrow(maxsprt_dat_calcs)
+maxsprt_dat_alts <-
+  maxsprt_dat_calcs %>%
+  left_join(
+    .,
+    cv_tab_alts %>% select(alt_str, modifier, mult, grps, thresh, cv),
+    c("grps", "thresh"),
+    relationship = "many-to-many"
+  ) %>%
+  arrange(grps, thresh, sim_i, modifier, mult, alt_str, mnth) %>%
+  select(grps, thresh, sim_i, modifier, mult, alt_str, everything())
+nrow(maxsprt_dat_alts)
+
+
+if(nrow(maxsprt_dat_alts) != (nrow(alt_mults) + 2) * nrow(maxsprt_dat_calcs)) {
+  stop("many-to-many join has not worked")
+}
+
+print(maxsprt_dat_alts, n = 30)
+
+
+maxsprt_dat_alts <-
+  maxsprt_dat_alts %>%
+  mutate(
+    # some cvs don't exist so those llr never reach cv
+    reached_cv = if_else(is.na(cv), 0L, as.integer(maxllr > cv)),
+    # create date for start of each quarter
+    dte = 
+      as_date(paste0(
+        substr(mnth, 1, 5),
+        sprintf("%02.0f", (as.integer(substr(mnth, 7, 7)) - 1) * 3 + 1),
+        "-01"
+      ))
+  )
+
+maxsprt_dat %>% dplyr::filter(is.na(cv))
+
+# have a peak
+maxsprt_dat_alts %>%
+  select(-dat_type) %>%
+  print(., n = 25)
+
+
+# first signif
+maxsprt_alts_signif <-
+  maxsprt_dat_alts %>%
+  group_by(grps, dat_type, thresh, sim_i, modifier, mult, alt_str) %>%
+  dplyr::filter(reached_cv > 0) %>%
+  arrange(dte) %>%
+  dplyr::filter(row_number() == 1) %>%
+  ungroup() %>%
+  rename(dte_reach_sig = dte)
+
+
+nrow(maxsprt_dat_alts)
+maxsprt_dat_alts <-
+  left_join(
+    maxsprt_dat_alts,
+    maxsprt_alts_signif %>% 
+      select(grps, dat_type, thresh, sim_i, modifier, mult, alt_str, dte_reach_sig),
+    c("grps", "dat_type", "thresh", "sim_i", "modifier", "mult", "alt_str")
+  )
+nrow(maxsprt_dat_alts)
+
+maxsprt_dat_alts
+
+
+maxsprt_dat_alts <- 
+  maxsprt_dat_alts %>%
+  mutate(
+    dte_reach_sig = if_else(is.na(dte_reach_sig), as_date(today()), dte_reach_sig),
+    reach_sig = dte >= dte_reach_sig
+  )
+
+# these are where the maxllr has dropped under the CV after exceeding it previously
+maxsprt_dat_alts %>%
+  dplyr::filter(
+    is.na(reach_sig) | 
+      is.na(reached_cv) | 
+      (as.logical(reached_cv) != reach_sig)
+  )
+
+
+
+maxsprt_dat_alts <- 
+  maxsprt_dat_alts %>%
+  select(-reached_cv)
+
+
+
+
+
+# ---- save_maxsprt_sim ----
+
+
+maxsprt_dat %>%
+  write_parquet(., sink = "out/sra_cum_maxsprt_sim.parquet")
+
+
+
+
+
+maxsprt_dat_alts %>%
+  write_parquet(., sink = "out/sra_cum_maxsprt_sim_alt_cvs.parquet")
 
 
 
