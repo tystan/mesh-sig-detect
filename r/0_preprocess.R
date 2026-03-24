@@ -26,7 +26,7 @@ source("r/_funcs.R")
 # ---- consts ----
 
 # arbitrarily, let's go with minimum cell count of 1 
-arbitrary_cell_min <- 1
+arbitrary_cell_min <- 0
 
 # these are the thresholds for pain_topic to be pain == TRUE
 # thresholds <- c(0.010, 0.025, 0.05, 0.075, 0.100, 0.150) 
@@ -42,7 +42,10 @@ target_lst <-
     "pelvic_mesh",
     "pelvic_mesh",
     "hernia_mesh",
-    c("hernia_mesh", "other_mesh")
+    c("hernia_mesh", "other_mesh"),
+    "hernia_mesh",
+    c("hernia_mesh", "other_mesh"),
+    "other_mesh"
   )
 
 compar_lst <-
@@ -51,7 +54,10 @@ compar_lst <-
     c("hernia_mesh", "other_mesh"),
     c("hernia_mesh", "other_mesh", "other_device"),
     "other_mesh",
-    "other_device"
+    "other_device",
+    c("pelvic_mesh", "other_mesh", "other_device"),
+    c("pelvic_mesh", "other_device"),
+    c("pelvic_mesh", "hernia_mesh", "other_device")
   )
 
 
@@ -177,6 +183,37 @@ clean_data %>%
   knitr::kable(.)
 
 
+type_lvls0 <- c("pelvic_mesh", "hernia_mesh", "other_mesh")
+type_lvls_edt0 <- str_to_sentence(str_replace_all(type_lvls0, "_", " "))
+
+
+tab1 <-
+  clean_data %>% 
+  dplyr::filter(type != "other_device") %>%
+  mutate(
+    type = str_to_sentence(str_replace_all(type, "_", " ")),
+    type = factor(type, levels = type_lvls_edt0),
+    pain_ae_ind = as.integer(pain_topic >= 0.05),
+    pain_ae = c("other reports", "pain reports")[pain_ae_ind + 1],
+    pain_ae = factor(pain_ae, levels =  c("pain reports", "other reports"))
+  ) %>% 
+  arrange(type, Date) %>% 
+  mutate(Quarter = str_c(year(Date), "-Q", quarter(Date, type = "quarter"))) %>% 
+  group_by(type, pain_ae, Quarter) %>% 
+  summarise(n = n(), .groups = "drop") %>% 
+  pivot_wider(names_from = c(type, pain_ae), values_from = "n", values_fill = 0) %>% 
+  arrange(Quarter)
+
+
+
+colnames(tab1) <- gsub("(.*)_(.*)", "\\2 in \\1", colnames(tab1))
+colnames(tab1) <- str_to_sentence(colnames(tab1))
+tab1
+tab1 %>% 
+  mutate(across(matches("^(Pain|Other)"), cumsum)) %>%
+  kable(.)
+
+
 
 # These are the device groups and subgroups.
 clean_data %>% 
@@ -281,6 +318,15 @@ cumul_dat <-
 toc()
 cumul_dat
 
+
+cumul_dat %>% 
+  filter(thresh == "0.050") %>% # str_detect(grps, "\\(a\\)"), 
+  group_by(grps) %>% 
+  summarise(min_mnth = min(mnth)) %>% 
+  print(., n = Inf)
+
+cumul_dat %>% 
+  filter(thresh == "0.050", str_detect(grps, "\\(c\\)"))
 
 # takes ~ 20 sec
 tic()

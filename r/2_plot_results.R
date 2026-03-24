@@ -141,20 +141,105 @@ plt_dat <-
 
 # ---- example_data ----
 
-cols_want <- c(
-  "Quarter" = "mnth",
-  "$t$" = "t",
-  "$a_t$" = "nA",
-  "$b_t$" = "nB",
-  "$c_t$" = "nC",
-  "$d_t$" = "nD"
-)
 
-sra_cum_prr_mc_adj %>%
-  dplyr::filter(substr(grps, 1, 3) == "(a)", thresh == "0.050") %>%
-  mutate(t = 1:n()) %>%
-  select(all_of(cols_want)) %>%
+# unique(sra_cum_prr_mc_adj$grps)
+# 
+# 
+# 
+# cols_want_0 <- c(
+#   "Quarter ($t$)"                         = "mnth",
+#   "Pain reports in\npelvic mesh ($a_t$)"  = "nA",
+#   "Other reports in\npelvic mesh ($b_t$)" = "nB",
+#   "Pain reports in\nhernia mesh ($c_t$)"  = "nC",
+#   "Other reports in\nhernia mesh ($d_t$)" = "nD"
+# )
+# cols_want_1 <- c(
+#   "Quarter ($t$)"                                = "mnth",
+#   "nA"                                           = "nA",
+#   "nB"                                           = "nB",
+#   "Pain reports in\n{hernia+other} mesh ($c_t$)"  = "nC",
+#   "Other reports in\n{hernia+other} mesh ($d_t$)" = "nD"
+# )
+# cols_want_2 <- c(
+#   "Quarter ($t$)"                                = "mnth",
+#   "nA"                                           = "nA",
+#   "nB"                                           = "nB",
+#   "Pain reports in {hernia+other} mesh ($c_t$)"  = "nC",
+#   "Other reports in {hernia+other} mesh ($d_t$)" = "nD"
+# )
+# 
+# cols_want_0
+# unname(cols_want_0)
+# 
+# # "(c) pelvic_mesh v hernia_mesh/other_mesh/other_device"
+# sra_cum_prr_mc_adj %>%
+#   dplyr::filter(substr(grps, 1, 3) == "(c)", thresh == "0.050") %>%
+#   select(all_of(cols_want_0))
+# 
+# 
+# sra_cum_prr_mc_adj %>%
+#   dplyr::filter(substr(grps, 1, 3) == "(f)", thresh == "0.050") %>%
+#   select(all_of(cols_want_1))
+
+
+
+clean_data_cols <-
+  cols(
+    Report_ID = col_double(),
+    Date = col_date(format = ""),
+    pain_word = col_logical(),
+    pain_topic = col_double(),
+    type = col_character()
+  )
+
+clean_data <- read_csv("dat/clean_data.csv", col_types = clean_data_cols)
+
+
+
+# make dup free
+clean_data <-
+  clean_data %>%  
+  arrange(Report_ID, Date, desc(pain_word)) %>% # pain first in dups
+  group_by(Report_ID) %>% 
+  dplyr::filter(row_number() == 1) %>%
+  ungroup(.) %>%  
+  arrange(Date, Report_ID, desc(pain_word), desc(pain_topic))
+
+
+
+
+type_lvls0 <- c("pelvic_mesh", "hernia_mesh", "other_mesh")
+type_lvls_edt0 <- str_to_sentence(str_replace_all(type_lvls0, "_", " "))
+
+
+tab1 <-
+  clean_data %>% 
+  dplyr::filter(type != "other_device") %>%
+  mutate(
+    type = str_to_sentence(str_replace_all(type, "_", " ")),
+    type = factor(type, levels = type_lvls_edt0),
+    pain_ae_ind = as.integer(pain_topic >= 0.05),
+    pain_ae = c("other reports", "pain reports")[pain_ae_ind + 1],
+    pain_ae = factor(pain_ae, levels =  c("pain reports", "other reports"))
+  ) %>% 
+  arrange(type, Date) %>% 
+  mutate(Quarter = str_c(year(Date), "-Q", quarter(Date, type = "quarter"))) %>% 
+  group_by(type, pain_ae, Quarter) %>% 
+  summarise(n = n(), .groups = "drop") %>% 
+  pivot_wider(names_from = c(type, pain_ae), values_from = "n", values_fill = 0) %>% 
+  arrange(Quarter)
+
+
+
+colnames(tab1) <- gsub("(.*)_(.*)", "\\2 in \\1", colnames(tab1))
+colnames(tab1) <- str_to_sentence(colnames(tab1))
+tab1
+tab1 %>% 
+  mutate(across(matches("^(Pain|Other)"), cumsum)) %>%
   kable(.)
+
+
+
 
 # ---- time_to_sig_plot1 ----
 
@@ -277,8 +362,8 @@ ggsave(
 
 
 
-thresh_use <- 0.040
-thresh_use_str <- sprintf("%0.3f", thresh_use)
+thresh_use <- 4:6 * 0.010
+(thresh_use_str <- sprintf("%0.3f", thresh_use))
 
 sra_stat_plt <-
   sra %>%
@@ -287,7 +372,7 @@ sra_stat_plt <-
   dplyr::filter(thresh %in% thresh_use_str) %>%
   ### only keep pelvic mesh as target vs whatever comparator
   # dplyr::filter(grepl("^.*pelvic.* v ", grps)) %>%
-  dplyr::filter(grepl("^\\([a-d]\\)", grps)) %>%
+  dplyr::filter(grepl("^\\([a-c]\\)", grps)) %>%
   mutate(
     grps = gsub(" v ", "\nv\n", grps),
     grps = gsub("\\([a-z]\\) ", "", grps),
@@ -343,13 +428,19 @@ sra_stat_plt %>%
   # geom_ribbon(alpha = 0.05, lty = 2)  %+%
   # facet_wrap(~ grps, scales = "free_y", ncol = 1) %+%
   facet_grid(
-    `Test` ~ grps, 
+    rows = vars(`Test`, `P(topic = 'pain') threshold` ,),
+    cols = vars(grps), 
     scales = "free_y", 
-    labeller = labeller(Test = function(x) paste0("Test: ", x))
+    switch = "y",
+    labeller = 
+      labeller(
+        Test = function(x) paste0("Test: ", x),
+        `P(topic = 'pain') threshold` = function(x) paste0("Prob threshold: ", x)
+      )
   ) %+%
   labs(
     # subtitle = "Pelvic mesh v hernia mesh",
-    subtitle = paste0("P(topic = 'pain') threshold = ", thresh_use_str),
+    # subtitle = paste0("P(topic = 'pain') threshold = ", thresh_use_str),
     y = "Test statistic",
     x = "Date (quarterly data accumulation)",
     col = "Signal detection\nmethod"
@@ -362,12 +453,14 @@ sra_stat_plt %>%
   scale_colour_manual(values = col_pal)  %+%
   # scale_colour_tableau(palette = "Color Blind", direction = -1) +
   theme_bw() %+%
-  theme(text = element_text(family = "serif")) 
+  theme(
+    text = element_text(family = "serif")
+  ) 
 
 
 ggsave(
   filename = "fig/multi-grps_multi-test_sig_detect_over_time_thresh-0.04.png", 
-  dpi = 900, width = 10, height = 8
+  dpi = 900, width = 7, height = 12
 )
 
 

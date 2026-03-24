@@ -197,6 +197,44 @@ signif_plt %>%
     fill = "Signal detection\nmethod"
   )
 
+
+csum_plt <-
+  signif_plt %>%
+  arrange(stat, grps, thresh, dte_reach_sig) %>%
+  group_by(stat, grps, thresh, dte_reach_sig) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(stat, grps, thresh) %>% 
+  arrange(stat, grps, thresh, dte_reach_sig) %>%
+  mutate(
+    tot = sum(n),
+    csum = cumsum(n) / tot
+  ) %>% 
+  ungroup()
+  
+csum_plt
+
+csum_plt %>%
+  ggplot(., aes(x = dte_reach_sig, y = csum, col = stat)) +
+  geom_point(alpha = 0.8) +
+  geom_line(alpha = 0.5) +
+  # geom_path(aes(group = interaction(stat, sim_i))) +
+  scale_color_manual(values = col_pal) +
+  # scale_colour_tableau(palette = "Color Blind", direction = -1) +
+  # geom_vline(xintercept = quantile(signif_plt$dte_reach_sig, c(0.01, 0.5, 0.99), type = 3)) +
+  theme_bw() +
+  theme(text = element_text(family = "serif")) +
+  labs(
+    x = expression("Date" ~ H[0] ~ "rejected (null hypothesis of no signal)"),
+    y = "Cumulative proportion of simulations",
+    col = "Signal detection\nmethod"
+  )
+
+ggsave(
+  filename = "fig/time_to_signal_method_cumulative.png",
+  dpi = 900, width = 8, height = 5
+)
+
+
 # signif_plt %>%
 #   arrange(grps, thresh) %>%
 #   ggplot(., aes(x = dte_reach_sig, y = as.numeric(thresh), col = stat)) +
@@ -354,14 +392,16 @@ sra_stat_plt <-
     `Test` = 
       case_when(
         # stat == "maxSPRT"       ~ paste("Maximised LLR > CV = ", sprintf("%1.3f", cv)), 
-        # stat == "maxSPRT"       ~ "Maximised LLR > CV", 
+        stat == "maxSPRT"       ~ "Maximised LLR > CV",
         stat == "BCPNN (MCadj)" ~ "IC lower 95% > 0",
-        # stat == "PRR (MCadj)"   ~ "PRR lower 95% > 1"
+        stat == "PRR (MCadj)"   ~ "PRR lower 95% > 1"
       ),
     `Test` = fct_inorder(`Test`),
     # truncate extreme values
-    test_stat = if_else((test_stat > 30) & (stat == "maxSPRT"), 30, test_stat),
+    test_stat = if_else((test_stat > 20) & (stat == "maxSPRT"), 20, test_stat),
     test_stat = if_else((test_stat < -3) & (stat == "BCPNN (MCadj)"), -3, test_stat),
+    test_stat = if_else((test_stat < 0) & (stat == "PRR (MCadj)"), 0, test_stat),
+    test_stat = if_else((test_stat > 5.1) & (stat == "PRR (MCadj)"), 5.1, test_stat),
     dte_reach_sig = if_else(dte_reach_sig > "2017-12-01", as_date(NA), dte_reach_sig),
     dte_reach_insta_sig =
       if_else(
@@ -418,7 +458,7 @@ sra_stat_plt %>%
 
 ggsave(
   filename = "fig/sim_multi-grps_multi-test_sig_detect_over_time_thresh-0.05.png", 
-  dpi = 900, width = 10, height = 8
+  dpi = 900, width = 8, height = 12
 )
 
 

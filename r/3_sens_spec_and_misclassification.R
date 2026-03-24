@@ -150,7 +150,7 @@ pop_n_at_rand(rep(1, 3), n = 3)
 pop_n_at_rand(1:5, n = 3)
 pop_n_at_rand(1:5) # n = 1
 pop_n_at_rand(c(6, 0, 8, 1), n = 8)
-pop_n_at_rand(c(6, 0, 8, 1), n = 15)
+# pop_n_at_rand(c(6, 0, 8, 1), n = 15)
 
 ### get_seq_cnts_from_cumul():
 # if we have a vector of cumulative counts, return the original count vector
@@ -343,7 +343,9 @@ dbl_rws <-
 
 
 dbl_rws %>% 
-  filter(n > 1) 
+  filter(n > 1) %>% 
+  inner_join(., pt_mg, "Report_ID") %>% 
+  with(., table(`Pain topic`, useNA = "ifany"))
 
 dbl_rws %>% 
   filter(n > 1, u_n == 1) 
@@ -388,8 +390,11 @@ pt_dat <-
 nrow(pt_dat)
 
 with(pt_dat, table(pain_truth, useNA = "ifany"))
+with(pt_dat, table(type, useNA = "ifany"))
 
-
+pt_dat %>% 
+  mutate(`thresh>=0.05` = pain_topic >= 0.05) %>% 
+  with(., table(`thresh>=0.05`, pain_truth, type, useNA = "ifany"))
 
 
 
@@ -457,9 +462,10 @@ thresh_pain_df <-
 
 
 thresh_pain_df %>% 
-  dplyr::filter(thresh %in% sprintf("%0.3f", 0.01 * c(4, 6, 8))) %>% 
+  dplyr::filter(thresh %in% sprintf("%0.3f", 0.01 * c(4, 5, 6))) %>% 
   arrange(type, param, desc(thresh)) %>% 
-  select(type, param, thresh, everything()) %>% 
+  mutate(est_95 = sprintf("%1.2f (%1.2f, %1.2f)", est, lo, up)) %>% 
+  select(type, param, thresh,cases, correct,est_95) %>% #  everything()) %>% 
   knitr::kable(., digits = 2)
 
 (mesh_types <- rev(levels(thresh_pain_df$type)))
@@ -580,11 +586,16 @@ misclass_pain_ex
 # note the mode of beta dist is (a - 1) / (a + b - 2)
 # also the larger a + b the smaller the variance
 
-par(mfrow = c(2, 2))
-hist(rbeta(1e+5, 100, 1), main = "pelvic_mesh | sens", xlim = 0:1) # pelvic_mesh |sens| 1.00| 0.95| 1.00|
-hist(rbeta(1e+5, 60, 16), main = "pelvic_mesh | spec", xlim = 0:1) # pelvic_mesh |spec| 0.78| 0.61| 0.89|
-hist(rbeta(1e+5, 81, 9), main = "other_mesh | sens", xlim = 0:1) # other_mesh |sens| 0.90| 0.75| 0.97|
-hist(rbeta(1e+5, 100, 21), main = "other_mesh | spec", xlim = 0:1) # other_mesh |spec| 0.83| 0.71| 0.91|
+png(filename = "fig/sim_approximated_beta_dist_sens_spec.png", units = "in", res = 200, width = 8, height = 8)
+
+  par(mfrow = c(2, 2))
+  hist(rbeta(1e+5, 100, 1), main = "pelvic_mesh | sens", xlim = 0:1) # pelvic_mesh |sens| 1.00| 0.95| 1.00|
+  hist(rbeta(1e+5, 60, 16), main = "pelvic_mesh | spec", xlim = 0:1) # pelvic_mesh |spec| 0.78| 0.61| 0.89|
+  hist(rbeta(1e+5, 81, 9), main = "other_mesh | sens", xlim = 0:1) # other_mesh |sens| 0.90| 0.75| 0.97|
+  hist(rbeta(1e+5, 100, 21), main = "other_mesh | spec", xlim = 0:1) # other_mesh |spec| 0.83| 0.71| 0.91|
+
+
+dev.off()
 par(mfrow = c(1, 1))
 
 set.seed(123)
@@ -660,6 +671,10 @@ p_spec_nonexp <- plot(probsens_pain_ex, parms = "spexp") %>% add_plt_extras(., 4
 
 ggarrange(p_sens_exp, p_sens_nonexp, p_spec_exp, p_spec_nonexp, nrow = 2, ncol = 2)
 
+ggsave(
+  filename = "fig/sim_bayes_priors_sens_spec.png", 
+  dpi = 200, width = 8, height = 8
+)
 
 probsens_pain_ex
 
@@ -912,6 +927,165 @@ toc()
 
 # table(pull(distinct(sim_cumul_qtrly_dat, sim_i)) %in% 1:1e+4, useNA = "ifany")
 
+
+
+# ---- negcontrol-misclass ----
+
+clean_data %>%
+  with(., table(type, pain_word)) %>%
+  knitr::kable(.)
+
+clean_data %>%
+  with(., table(type, pain_topic >= 0.05)) %>%
+  knitr::kable(.)
+
+
+
+
+
+rand_tab <-
+  clean_data %>% 
+  dplyr::filter(type != "other_device")  %>%
+  mutate(
+    pain_ae_ind = as.integer(pain_topic >= 0.05),
+    pain_ae = c("other reports", "pain reports")[pain_ae_ind + 1],
+    pain_ae = factor(pain_ae, levels =  c("pain reports", "other reports"))
+  ) 
+
+n_tab <- nrow(rand_tab)
+tab_labs <- c(rep("mesh A", floor(0.75 * n_tab)), rep("mesh B", ceiling(0.25 * n_tab)))
+stopifnot(length(tab_labs) == n_tab)
+
+get_sim_deltas <- function(nABCD_mat) {
+
+  # negcont_ex_i <- matrix(
+  #   nABCD, 
+  #   nrow = 2, 
+  #   dimnames = list(c("[pain]", "not [pain]"), c("mesh A", "mesh B"))
+  # )
+  int_matrix_to_named_vec(nABCD_mat)
+  
+  
+  set.seed(123)
+  probsens_negcont_ex <- 
+    probsens(
+      nABCD_mat, # pain_ex
+      type = "outcome",
+      reps = 3,
+      # The sensitivity of outcome classification among those with the exposure
+      seca = list("beta", c(100, 1)),
+      # The specificity of outcome classification among those with the exposure
+      spca = list("beta", c(60, 16)),
+      # The sensitivity of outcome classification among those without the exposure
+      seexp = list("beta", c(81, 9)),
+      # The specificity of outcome classification among those without the exposure
+      spexp = list("beta", c(100, 21)),
+      corr_se = 0.25, # Correlations should be > 0 and < 1 (BUT more than ~0.3 brings errors [infeasibility])
+      corr_sp = 0.25  # [from testing these values almost make no difference]
+    )
+  
+  sim_2x2 <- 
+    probsens_negcont_ex$sim_df %>% 
+    select(all_of(c("ab", "cb", "bb", "db"))) %>% 
+    rename(all_of(c("nA" = "ab", "nB" = "cb", "nC" = "bb", "nD" = "db")))
+
+  return(as.data.frame(t(t(sim_2x2[1, 1:4] - int_matrix_to_named_vec(nABCD_mat)))))
+}
+
+mk_new_rand_tab <- function(ignored_input) {
+  rand_tab_i <-
+    rand_tab %>%
+    mutate(
+      type = sample(tab_labs),
+      type = factor(type)
+    ) %>% 
+    arrange(type, Date) %>% 
+    mutate(Quarter = str_c(year(Date), "-Q", quarter(Date, type = "quarter"))) %>% 
+    group_by(type, pain_ae, Quarter) %>% 
+    summarise(n = n(), .groups = "drop") %>% 
+    pivot_wider(names_from = c(type, pain_ae), values_from = "n", values_fill = 0) %>% 
+    arrange(Quarter)
+  
+  rand_tab_i <-
+    rand_tab_i %>% 
+    rename(
+      nA =`mesh A_pain reports`,
+      nB = `mesh A_other reports`,
+      nC = `mesh B_pain reports`,
+      nD = `mesh B_other reports`
+    )
+  
+  rand_tab_i %>% 
+    mutate(across(matches("^n[A-D]"), cumsum))
+}
+print(mk_new_rand_tab(), n = Inf)
+print(mk_new_rand_tab(), n = Inf)
+print(mk_new_rand_tab(), n = Inf)
+
+
+set.seed(5348976)
+negcont_tab <- 
+  tibble(sim_i = 1:1e3) %>% 
+  mutate(sim_dat = map(sim_i, mk_new_rand_tab))
+  
+
+print(negcont_tab$sim_dat[[1]], n = Inf)
+print(negcont_tab$sim_dat[[100]], n = Inf)
+
+negcont_tab <- 
+  negcont_tab %>% 
+  mutate(
+    final_t_counts = 
+      map(
+        sim_dat, 
+        function(x) {
+          fr <- x %>% dplyr::filter(row_number() == n()) %>% select(-Quarter)
+          matrix(
+            unlist(c(fr)), 
+            nrow = 2, 
+            dimnames = list(c("[pain]", "not [pain]"), c("mesh A", "mesh B"))
+          )
+        }
+      ),
+    sim_deltas = 
+      map(
+        final_t_counts, 
+        get_sim_deltas
+      )
+  )
+
+negcont_tab
+
+negcont_tab$final_t_counts[[1]]
+negcont_tab$final_t_counts[[100]]
+
+negcont_tab$sim_deltas[[1]]
+negcont_tab$sim_deltas[[100]]
+
+
+# takes a minute or so to get through 10k == 1e+4 simulations
+tic()
+negcont_tab <- 
+  negcont_tab %>% 
+  mutate(
+    peturbed_df = map2(
+        .x = sim_dat, 
+        .y = sim_deltas ,
+      \(x, y) perturb_real_by_misclass_sim(real_df = x, sim_deltas_df = y)
+    )
+  )
+toc()
+
+
+negcont_tab
+
+print(negcont_tab$sim_dat[[1]], n = Inf)
+print(negcont_tab$peturbed_df[[1]], n = Inf)
+print(negcont_tab$sim_dat[[100]], n = Inf)
+print(negcont_tab$peturbed_df[[100]], n = Inf)
+
+
+write_rds(negcont_tab, file = "dat/neg_control_sims.rds")
 
 
 
@@ -1222,7 +1396,7 @@ sra_cum_prr_mc_adj %>%
   write_parquet(., sink = "out/sra_cum_prr_sim_mc_adj.parquet")
 
 
-
+# read_parquet("out/sra_cum_prr_sim_mc_adj.parquet")
 
 
 # ---- maxsprt ----
@@ -1563,6 +1737,11 @@ maxsprt_dat %>%
 
 maxsprt_dat_alts %>%
   write_parquet(., sink = "out/sra_cum_maxsprt_sim_alt_cvs.parquet")
+
+
+# ---- negative-control ----
+
+
 
 
 
