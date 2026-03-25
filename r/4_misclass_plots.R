@@ -30,6 +30,8 @@ library("ggpubr")
 col_pal <- c("darkorange", "cyan4", "purple")
 
 
+# ---- sim-data ----
+
 ## ---- plot_sim ----
 
 
@@ -146,7 +148,7 @@ plt_dat <-
 
 
 
-# ---- time_to_sig_plot1 ----
+## ---- time_to_sig_plot1 ----
 
 
 
@@ -351,7 +353,7 @@ signif_heat_plt %>%
 
 
 
-# ---- stat_over_time_plot1 ----
+## ---- stat_over_time_plot1 ----
 
 
 
@@ -462,6 +464,362 @@ ggsave(
 )
 
 
+
+
+# ---- neg-cntl-sim-data ----
+
+## ---- plot_sim ----
+
+
+sra_cum_prr_sim_mc_adj_negcntl <-  read_parquet("out/sra_cum_prr_sim_mc_adj_negcntl.parquet")
+sra_cum_bcpnn_sim_mc_adj_negcntl <-  read_parquet("out/sra_cum_bcpnn_sim_mc_adj_negcntl.parquet")
+sra_cum_maxsprt_sim_negcntl <-  read_parquet("out/sra_cum_maxsprt_sim_negcntl.parquet")
+
+
+sra_negcntl <-
+  bind_rows(
+    sra_cum_bcpnn_sim_mc_adj_negcntl %>% mutate(stat = "BCPNN (MCadj)"),
+    sra_cum_prr_sim_mc_adj_negcntl %>% mutate(stat = "PRR (MCadj)"),
+    sra_cum_maxsprt_sim_negcntl %>% mutate(stat = "maxSPRT")
+  ) %>%
+  mutate(stat = fct_inorder(stat)) %>%
+  select(stat, everything())
+
+# sra %>%
+#   dplyr::filter(stat == "BCPNN (MCadj)")
+
+
+sra_negcntl <-
+  sra_negcntl %>%
+  mutate(
+    test_stat = 
+      case_when(
+        stat == "maxSPRT"     ~ maxllr,
+        stat == "PRR (MCadj)" ~ ci_lo,
+        stat == "BCPNN (MCadj)" ~ ci_lo
+      ),
+    test_thresh = 
+      case_when(
+        stat == "maxSPRT"     ~ cv,
+        stat == "PRR (MCadj)" ~ 1,
+        stat == "BCPNN (MCadj)" ~ 0
+      ),
+    rr_stat = 
+      case_when(
+        stat == "maxSPRT"     ~ rre,
+        stat == "PRR (MCadj)" ~ est,
+        stat == "BCPNN (MCadj)" ~ 2 ^ est
+      )
+  )
+
+
+
+
+# thresholds <- sort(unique(sra[["thresh"]]))
+# length(thresholds)
+
+
+
+
+
+plt_dat_neg_cntl <-
+  tibble(grps = "(z) mesh A vs mesh B", thresh = sprintf("%1.3f", 0.05)) %>%
+  bind_cols(.,
+    bind_rows(
+      sra_cum_bcpnn_sim_mc_adj_negcntl %>% 
+        mutate(
+          cv = 0, 
+          stat = "IC (BCPNN, Lower 95% CI)"
+        ) %>%
+        select(stat, sim_i, dte, cv, val = ci_lo, reach_sig, dte_reach_sig),
+      sra_cum_prr_sim_mc_adj_negcntl %>%
+        mutate(
+          cv = 1,
+          stat = "RR (PRR, Lower 95% CI)"
+        ) %>%
+        select(stat, sim_i, dte, cv, val = ci_lo, reach_sig, dte_reach_sig),
+      sra_cum_maxsprt_sim_negcntl %>%
+        mutate(stat = "MaxSPRT (max LLR)") %>%
+        select(stat, sim_i, dte, cv, val = maxllr, reach_sig, dte_reach_sig)
+    ) 
+)
+
+sig_reach_dat_neg_cntl <-
+  plt_dat_neg_cntl %>%
+  arrange(stat, grps, thresh, sim_i, dte) %>%
+  group_by(stat, grps, thresh, sim_i) %>%
+  dplyr::filter(reach_sig == 1) %>%
+  dplyr::filter(row_number() == 1) %>%
+  select(stat, grps, thresh, sim_i, dte_reached = dte) %>%
+  # now create separation between reached CV values when it occurs
+  group_by(stat, thresh, sim_i, dte_reached) %>%
+  mutate(rep_dte = 1:n()) %>%
+  ungroup() %>%
+  mutate(dte_reached = dte_reached + days(10 * (rep_dte - 1))) %>%
+  select(-rep_dte)
+
+
+
+
+
+plt_dat_neg_cntl <-
+  left_join(
+    plt_dat_neg_cntl,
+    sig_reach_dat_neg_cntl,
+    c("stat", "grps", "thresh", "sim_i")
+  ) # 
+
+plt_dat_neg_cntl %>%
+  dplyr::filter(dte_reach_sig != dte_reached)
+
+
+plt_dat_neg_cntl <-
+  plt_dat_neg_cntl %>%
+  mutate(
+    stat = fct_inorder(stat)
+  )
+
+
+# plt_dat %>%
+#   dplyr::filter(thresh == "0.050", grepl("(c)", grps, fixed = TRUE))
+
+
+
+
+## ---- time_to_sig_plot1 ----
+
+
+
+date_signif_dat_negcntl <-
+  sra_negcntl %>%
+  mutate(grps = "(z) mesh A vs mesh B", thresh = sprintf("%1.3f", 0.05)) %>%
+  group_by(stat, grps, thresh, sim_i) %>%
+  arrange(dte) %>%
+  dplyr::filter(reach_sig) %>%
+  dplyr::filter(row_number() == 1) %>%
+  ungroup() %>%
+  arrange(stat, grps, thresh, sim_i) 
+
+
+signif_plt_negcntl <-
+  date_signif_dat_negcntl %>%
+  ### only keep pelvic mesh as target vs whatever comparator
+  # dplyr::filter(grepl("^.*pelvic.* v ", grps)) %>%
+  mutate(
+    grps = gsub("\\([a-z]\\) ", "", grps),
+    grps = gsub("_", " ", grps),
+    # grps = gsub("pelvic mesh", "Pelvic mesh", grps),
+    # grps = gsub("hernia mesh", "Hernia mesh", grps),
+    # grps = str_to_sentence(grps),
+    grps = gsub(" v ", "\nv\n", grps, fixed = TRUE),
+    grps = fct_inorder(grps)
+    # stat = fct_inorder(stat)
+  ) 
+
+
+# levels(signif_plt$grps)
+
+signif_plt_negcntl %>%
+  arrange(grps, thresh) %>%
+  ggplot(., aes(x = dte_reach_sig, fill = stat)) +
+  geom_bar(alpha = 0.8, col = NA) +
+  # geom_path(aes(group = interaction(stat, sim_i))) +
+  scale_fill_manual(values = col_pal) +
+  # scale_colour_tableau(palette = "Color Blind", direction = -1) +
+  # geom_vline(xintercept = quantile(signif_plt$dte_reach_sig, c(0.01, 0.5, 0.99), type = 3)) +
+  facet_grid(stat ~ grps) +
+  # facet_wrap( ~ grps, ncol = 1) +
+  theme_bw() +
+  theme(text = element_text(family = "serif")) +
+  labs(
+    x = expression("Date" ~ H[0] ~ "rejected (null hypothesis of no signal)"),
+    y = "Number of simulations",
+    # col = "Signal detection\nmethod",
+    fill = "Signal detection\nmethod"
+  )
+
+
+csum_plt <-
+  signif_plt_negcntl %>%
+  arrange(stat, grps, thresh, dte_reach_sig) %>%
+  group_by(stat, grps, thresh, dte_reach_sig) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(stat, grps, thresh) %>% 
+  arrange(stat, grps, thresh, dte_reach_sig) %>%
+  mutate(
+    tot = 1000,
+    csum = cumsum(n) / tot
+  ) %>% 
+  ungroup()
+
+csum_plt
+
+csum_plt %>%
+  ggplot(., aes(x = dte_reach_sig, y = csum, col = stat)) +
+  geom_point(alpha = 0.8) +
+  geom_line(alpha = 0.5) +
+  # geom_path(aes(group = interaction(stat, sim_i))) +
+  scale_color_manual(values = col_pal) +
+  # scale_colour_tableau(palette = "Color Blind", direction = -1) +
+  # geom_vline(xintercept = quantile(signif_plt$dte_reach_sig, c(0.01, 0.5, 0.99), type = 3)) +
+  theme_bw() +
+  theme(text = element_text(family = "serif")) +
+  labs(
+    x = expression("Date" ~ H[0] ~ "rejected (null hypothesis of no signal)"),
+    y = "Cumulative proportion of simulations",
+    col = "Signal detection\nmethod"
+  )
+
+ggsave(
+  filename = "fig/time_to_signal_method_cumulative_negcntl.png",
+  dpi = 900, width = 8, height = 5
+)
+
+
+# signif_plt %>%
+#   arrange(grps, thresh) %>%
+#   ggplot(., aes(x = dte_reach_sig, y = as.numeric(thresh), col = stat)) +
+#   geom_point(alpha = 0.2) +
+#   # geom_path(aes(group = interaction(stat, sim_i))) +
+#   scale_colour_manual(values = col_pal) +
+#   # scale_colour_tableau(palette = "Color Blind", direction = -1) +
+#   facet_grid(stat ~ grps) +
+#   # facet_wrap( ~ grps, ncol = 1) +
+#   theme_bw() +
+#   theme(text = element_text(family = "serif")) +
+#   labs(
+#     x = expression("Date" ~ H[0] ~ "rejected (null hypothesis of no signal)"),
+#     y = "Threshold for P(topic = 'pain' | doc) to be classed a 'pain' adverse event",
+#     col = "Signal detection\nmethod"
+#   )
+
+# ggsave(
+#   filename = "fig/time_to_signal_method_facets.png", 
+#   dpi = 900, width = 9, height = 9
+# )
+# ggsave(
+#   filename = "fig/sim_data_time_to_signal_method_facets.pdf",
+#   device = cairo_pdf, # embed fonts
+#   width = 9, height = 9, units = "in"
+# )
+
+
+
+
+
+
+
+
+## ---- stat_over_time_plot1 ----
+
+
+
+thresh_use <- 0.050
+thresh_use_str <- sprintf("%0.3f", thresh_use)
+
+sra_stat_plt_negcntl <-
+  sra_negcntl %>%
+  mutate(grps = "(z) mesh A vs mesh B", thresh = sprintf("%1.3f", 0.05)) %>%
+  # keep only subset of thresholds (too many colours otherwise)
+  # dplyr::filter(thresh %in% sprintf("%0.3f", seq(0.02, 0.08, by = 0.02))) %>%
+  dplyr::filter(thresh %in% thresh_use_str) %>%
+  ### only keep pelvic mesh as target vs whatever comparator
+  # dplyr::filter(grepl("^.*pelvic.* v ", grps)) %>%
+  dplyr::filter(grepl("^\\([z]\\)", grps)) %>%
+  mutate(
+    grps = gsub(" v ", "\nv\n", grps),
+    grps = gsub("\\([a-z]\\) ", "", grps),
+    grps = gsub("_", " ", grps),
+    # grps = gsub("pelvic mesh", "Pelvic mesh", grps),
+    # grps = gsub("hernia mesh", "Hernia mesh", grps),
+    # grps = gsub("other mesh", "Other mesh", grps),
+    grps = fct_inorder(grps),
+    stat = fct_inorder(stat)
+  ) 
+
+thresholds <- sort(unique(sra_stat_plt_negcntl[["thresh"]]))
+# length(thresholds)
+# thresh_scale <- rev(hcl.colors(length(thresholds), "SunsetDark"))
+# thresh_scale <- rev(hcl.colors(length(thresholds) + 1, "Inferno"))[-1] 
+
+
+
+sra_stat_plt_negcntl <-
+  sra_stat_plt_negcntl %>%
+  mutate(
+    reach_sig_alpha = ifelse(reach_sig, 1, 0.8),
+    `P(topic = 'pain') threshold` = thresh,
+    `Test` = 
+      case_when(
+        # stat == "maxSPRT"       ~ paste("Maximised LLR > CV = ", sprintf("%1.3f", cv)), 
+        stat == "maxSPRT"       ~ "Maximised LLR > CV",
+        stat == "BCPNN (MCadj)" ~ "IC lower 95% > 0",
+        stat == "PRR (MCadj)"   ~ "PRR lower 95% > 1"
+      ),
+    `Test` = fct_inorder(`Test`),
+    # truncate extreme values
+    test_stat = if_else((test_stat > 20) & (stat == "maxSPRT"), 20, test_stat),
+    test_stat = if_else((test_stat < -3) & (stat == "BCPNN (MCadj)"), -3, test_stat),
+    test_stat = if_else((test_stat < 0) & (stat == "PRR (MCadj)"), 0, test_stat),
+    test_stat = if_else((test_stat > 5.1) & (stat == "PRR (MCadj)"), 5.1, test_stat),
+    dte_reach_sig = if_else(dte_reach_sig > "2017-12-01", as_date(NA), dte_reach_sig),
+    dte_reach_insta_sig =
+      if_else(
+        is.na(dte_reach_sig) | (dte_reach_sig != dte), 
+        as_date(NA), 
+        dte_reach_sig
+      )
+  ) 
+
+
+print(sra_stat_plt_negcntl, n = 25)
+
+sra_stat_plt_negcntl %>%
+  ggplot(
+    ., 
+    aes(
+      x = dte, 
+      y = test_stat, 
+      col = stat, 
+      group = interaction(stat, sim_i)
+      # alpha = reach_sig_alpha
+    )
+  ) +
+  geom_hline(aes(yintercept = test_thresh), col = "black") + # null value
+  # geom_vline(aes(xintercept = dte_reach_sig, col = stat), alpha = 0.5) + # sig first reached
+  geom_line(alpha = 0.05)+
+  geom_jitter(
+    data = filter(sra_stat_plt_negcntl, !is.na(dte_reach_insta_sig)), 
+    aes(x = dte_reach_insta_sig),
+    height = 0, width = 20, alpha = 0.5
+  ) +
+  facet_grid(
+    `Test` ~ grps, 
+    scales = "free_y", 
+    labeller = labeller(Test = function(x) paste0("Test: ", x))
+  ) +
+  labs(
+    # subtitle = "Pelvic mesh v hernia mesh",
+    subtitle = paste0("P(topic = 'pain') threshold = ", thresh_use_str),
+    y = "Test statistic",
+    x = "Date (quarterly data accumulation)",
+    col = "Signal detection\nmethod"
+  ) +
+  scale_x_continuous(
+    breaks = as_date(paste0(seq(2013, 2017, by = 1), "-01-01")), 
+    labels = function(x) year(x)
+  ) +
+  # datetime_scale(trans = "date", breaks = as_date(paste0(seq(2013, 2017, by = 1), "-01-01"))) +
+  scale_colour_manual(values = col_pal)  +
+  # scale_colour_tableau(palette = "Color Blind", direction = -1) +
+  theme_bw() +
+  theme(text = element_text(family = "serif")) 
+
+
+ggsave(
+  filename = "fig/sim_negcntl_multi-grps_multi-test_sig_detect_over_time_thresh-0.05.png", 
+  dpi = 900, width = 8, height = 12
+)
 
 
 
