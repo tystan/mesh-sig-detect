@@ -665,9 +665,14 @@ add_plt_extras <- function(plt_obj, which_param = 1, rm_dens_geom = TRUE) {
     theme_classic()
 }
 
+### for reference to the add_plt_extras(which_param = ...) function parameter:
+#                                             [,1]                                      [,2]                        
+# [1,] which == __1__     "Sensitivity of Exposed" which == __3__    "Specificity of Exposed"    
+# [2,] which == __2__ "Sensitivity of Not exposed" which == __4__"Specificity of Not exposed"
+
 p_sens_exp <- plot(probsens_pain_ex, parms = "seca") %>% add_plt_extras(., 1)
-p_spec_exp <-plot(probsens_pain_ex, parms = "spca") %>% add_plt_extras(., 2)
-p_sens_nonexp <- plot(probsens_pain_ex, parms = "seexp") %>% add_plt_extras(., 3)
+p_spec_exp <-plot(probsens_pain_ex, parms = "spca") %>% add_plt_extras(., 3)
+p_sens_nonexp <- plot(probsens_pain_ex, parms = "seexp") %>% add_plt_extras(., 2)
 p_spec_nonexp <- plot(probsens_pain_ex, parms = "spexp") %>% add_plt_extras(., 4)
 
 ggarrange(p_sens_exp, p_sens_nonexp, p_spec_exp, p_spec_nonexp, nrow = 2, ncol = 2)

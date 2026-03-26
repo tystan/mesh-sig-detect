@@ -213,7 +213,7 @@ csum_plt <-
   ) %>% 
   ungroup()
   
-csum_plt
+csum_plt %>%  print(., n = Inf)
 
 csum_plt %>%
   ggplot(., aes(x = dte_reach_sig, y = csum, col = stat)) +
@@ -652,7 +652,8 @@ csum_plt <-
   ) %>% 
   ungroup()
 
-csum_plt
+csum_plt %>% 
+  print(., n = Inf)
 
 csum_plt %>%
   ggplot(., aes(x = dte_reach_sig, y = csum, col = stat)) +
