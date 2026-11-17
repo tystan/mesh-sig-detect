@@ -145,6 +145,7 @@ where
 In the context of our data, the values $z$, $C_n$ and $n$ are the quantities $\frac{c_t + d_t}{a_t + b_t}$, $a_t$ and $a_t + c_t$, respectively, at time $t$.
 
 Therefore the RR maximum likelihood estimate at time $t$ can be re-written
+
 $$
 \begin{aligned}
 \widehat{\text{RR}}_t 
@@ -159,6 +160,7 @@ $$
 \\
 \end{aligned}
 $$
+
 which is the PRR estimate at time $t$ as before.
 
 The (maximised) log-likelihood ratio statistic of $\widehat{\text{PRR}}_t$ (equivalently, $\widehat{\text{RR}}_t$) can be determined calculated as
