@@ -98,9 +98,7 @@ The PRR estimate is calculated
 In the context of signal detection, an elevated proportional reporting ratio is of concern. Therefore the one-sided hypothesis test $H_0: \text{PRR} \leq 1$ (proportional reporting of the target is less than the comparator) is used and is not rejected until
 
 $$
-\widehat{\text{PRR}}_t 
-{\times}
-\exp \left\{{- Z_{\alpha}^{*}  \sqrt{\frac{1}{a_t} + \frac{1}{a_t + b_t} + \frac{1}{c_t} + \frac{1}{c_t+d_t}}}\right\} > 1
+\widehat{\text{PRR}}_t {\times} \exp \left\{ - Z_{\alpha}^{*}  \sqrt{ \frac{1}{a_t} + \frac{1}{a_t + b_t} + \frac{1}{c_t} + \frac{1}{c_t+d_t} } \right\} > 1
 $$
 
 at the $\alpha$ level where $Z_{\alpha}^{*}$ is the $(1-\alpha)^{\text{th}}$ quantile of the standard normal distribution. The above threshold is equivalent to the lower bound of the approximate $100(1-2\alpha)$\% confidence interval for a standard two-sided hypothesis test.
