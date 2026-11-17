@@ -98,7 +98,7 @@ The PRR estimate is calculated
 In the context of signal detection, an elevated proportional reporting ratio is of concern. Therefore the one-sided hypothesis test $H_0: \text{PRR} \leq 1$ (proportional reporting of the target is less than the comparator) is used and is not rejected until
 
 $$
-\widehat{\text{PRR}}_t {\times} \exp \left\{ - Z_{\alpha}^{*}  \sqrt{ \frac{1}{a_t} + \frac{1}{a_t + b_t} + \frac{1}{c_t} + \frac{1}{c_t+d_t} } \right\} > 1
+\widehat{\text{PRR}}_t {\times} \exp \left( - Z_{\alpha}^{*}  \sqrt{ \frac{1}{a_t} + \frac{1}{a_t + b_t} + \frac{1}{c_t} + \frac{1}{c_t+d_t} } \right) > 1
 $$
 
 at the $\alpha$ level where $Z_{\alpha}^{*}$ is the $(1-\alpha)^{\text{th}}$ quantile of the standard normal distribution. The above threshold is equivalent to the lower bound of the approximate $100(1-2\alpha)$\% confidence interval for a standard two-sided hypothesis test.
@@ -110,12 +110,15 @@ at the $\alpha$ level where $Z_{\alpha}^{*}$ is the $(1-\alpha)^{\text{th}}$ qua
 ####  Bayesian Confidence Propagation Neural Network (BCPNN) Information Component (IC)
 
 The Information Component (IC) statistic is an estimate of the observed-to-expected ratio of the number of target exposure AEs of interest on the log${}_2$-scale under independence between the target exposure and AEs of interest based on information theory [(Bate et al., 1998)](https://doi.org/10.1007/s002280050466)
+
 $$
 \text{IC}_{XY} = \log_2 \frac{P_{X, Y}(a_t + b_t,a_t + c_t)}{P_X(a_t + b_t) P_Y(a_t + c_t)}
 $$
+
 where $P_X(X=x)$ denotes the marginal probability of an observed count $x$ for the target exposure, $P_Y(Y=y)$ denotes the marginal probability of an observed count $y$ for the AE of interest, and $P_{X,Y}(X=x, Y=y)$ denotes the joint probability.
 
 The BCPNN IC of [Noren et al. (2006)](https://doi.org/10.1002/sim.2473) uses a Bayesian inference based *maximum a posteriori* (m.a.p.) central estimate of the IC,  
+
 $$
 \widehat{\text{IC}}_t = \log_2 \frac{\text{E}\left[ \hat{p}_a \right]}{\text{E}\left[ \hat{p}_a + \hat{p}_b\right]\text{E}\left[ \hat{p}_a + \hat{p}_c\right]}
 $$
