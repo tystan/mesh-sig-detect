@@ -4,9 +4,15 @@
 
 Time to signal analysis for spontaneous report data on pelvic mesh medical device
 
+## Publication
 
-![](https://github.com/tystan/mesh-sig-detect/blob/main/fig/sim_multi-grps_multi-test_sig_detect_over_time_thresh-0.05.png)
+This work is now published in `Scientific Reports` as [*Signal detection of adverse events in medical devices using natural language processing: a case study in pelvic mesh*](https://doi.org/10.1038/s41598-026-50950-z).
 
+### *Results* section plot
+
+*Figure 3: The three signal detection methods with adjustment for multiple comparisons applied to the 1000 misclassification simulated datasets tested for disproportional pain reports in pelvic vs hernia/other mesh (using a topic threshold of 0.05). Each line represents the accumulating disproportionality test statistic towards the horizontal black critical value line. The dots are jittered versions of the time each simulation achieves significance.*
+
+<img src="https://github.com/tystan/mesh-sig-detect/blob/main/fig/sim_multi-grps_multi-test_sig_detect_over_time_thresh-0.05.png" alt="Figure 3 from https://doi.org/10.1038/s41598-026-50950-z" height="700" align="center">
 
 ## Data source
 
@@ -173,10 +179,23 @@ a_t  \ln\left(\frac{a_t + b_t}{a_t + b_t +c_t + d_t}\right) -
 c_t \ln\left(\frac{c_t + d_t}{a_t + b_t + c_t + d_t}\right)
 $$
 
-The maxSPRT test is considered significant when $LLR_t$ is greater than the pre-computed critical value which is the $100(1-\alpha)$\% percentile of the  $LLR_t$ values generated under the null hypothesis $\text{RR}_t = 1$ for group sequential looks at the data $t = t_1, t_2, \ldots, t_k$. The CV can either be computed using the 95th percentile of $LLR_t$ values with the exact joint binomial probabilities over $k$ looks of the data accumulation under the null hypothesis, or by MCMC sampling of binomial event accumulation (and associated $LLR_t$ values) to approximate the $LLR$ distribution when the exact CV computation is computationally intractable.\footnote{The \texttt{Sequential} R package exact CV function suggests "not using values greater than 1000" in regards to the total events to potentially be observed over the follow-up.}
+The maxSPRT test is considered significant when $LLR_t$ is greater than the pre-computed critical value which is the $100(1-\alpha)$\% percentile of the  $LLR_t$ values generated under the null hypothesis $\text{RR}_t = 1$ for group sequential looks at the data $t = t_1, t_2, \ldots, t_k$. The CV can either be computed using the 95th percentile of $LLR_t$ values with the exact joint binomial probabilities over $k$ looks of the data accumulation under the null hypothesis, or by MCMC sampling of binomial event accumulation (and associated $LLR_t$ values) to approximate the $LLR$ distribution when the exact CV computation is computationally intractable (the [`Sequential`](https://cran.r-project.org/web/packages/Sequential/index.html) R package exact CV function suggests "not using values greater than 1000" in regards to the total events to potentially be observed over the follow-up).
 
 
+## Supplementary Section SM5: Uncertainty analysis for misclassification bias on a pseudo-negative control
 
+Supplementary Figures S7 and S8 show that maxSPRT had the least false positives (0.5\%) in
+the pseudo-negative control scenario with 1,000 simulations. The BCPNN method was the
+next best with 3.3\% false positives at the end of 2017, while PRR had 4.9\%.
+
+*Supplementary Figure S7: The three multiple comparison adjusted signal detection methods
+applied to the 1,000 pseudo-negative control, misclassification bias simulated datasets,
+testing for disproportional pain reports between mesh A and mesh B (using a topic threshold
+of 0.05). Each line represents the accumulating disproportionality test statistic towards the
+horizontal black critical value line. The dots (jittered for visibility) represent the time a
+simulated dataset achieves significance.*
+
+<img src="https://github.com/tystan/mesh-sig-detect/blob/main/fig/sim_negcntl_multi-grps_multi-test_sig_detect_over_time_thresh-0.05.png" alt="Supplementary Figure S7 from https://doi.org/10.1038/s41598-026-50950-z" height="700" align="center">
 
 
 
